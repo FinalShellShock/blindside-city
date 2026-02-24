@@ -523,56 +523,49 @@ function App() {
                   </div>
 
                   {/* Scoring events section */}
-                  <div style={{padding:"16px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div style={{padding:"12px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                     <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,marginBottom:8}}>⚡ SCORING EVENTS</p>
-                    {epEvents.length > 0 ? epEvents.map((ev, i) => {
-                      const rule = SCORING_RULES[ev.type];
-                      const c = CONTESTANTS.find(x => x.name === ev.contestant);
-                      const curTribe = getEffectiveTribe(ev.contestant);
-                      return (
-                        <div key={i} style={{marginBottom:8}}>
-                          <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:6,background:"rgba(255,255,255,0.02)",borderLeft:`2px solid ${tribeColor(curTribe)}`}}>
-                            <Portrait slug={c?.slug} tribe={curTribe} size={28} eliminated={isElim(eliminated,ev.contestant)}/>
-                            <div style={{flex:1}}>
-                              <span style={{color:"#E8D5B5",fontWeight:600,fontSize:14}}>{ev.contestant}</span>
-                              <span style={{color:"#A89070",fontSize:13}}> · {rule?.label}</span>
+                    {epEvents.length > 0 ? (
+                      <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>
+                        {epEvents.map((ev, i) => {
+                          const rule = SCORING_RULES[ev.type];
+                          const curTribe = getEffectiveTribe(ev.contestant);
+                          return (
+                            <div key={i}>
+                              <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 2px"}}>
+                                <span style={{fontWeight:700,fontSize:14,color:tribeColor(curTribe),flexShrink:0}}>{ev.contestant}</span>
+                                <span style={{color:"#A89070",fontSize:13,flex:1}}>{rule?.label}</span>
+                                <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,color:rule?.points>=0?"#4ADE80":"#F87171",flexShrink:0}}>
+                                  {rule?.points>0?"+":""}{rule?.points}
+                                </span>
+                              </div>
+                              <ReactionBar
+                                reactions={(ep.eventReactions||{})[String(i)]||{}}
+                                onReact={(emoji)=>addReaction(ep.number,`event_${i}`,emoji)}
+                                currentUser={currentUser}
+                              />
                             </div>
-                            <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:14,color:rule?.points>=0?"#4ADE80":"#F87171"}}>
-                              {rule?.points>0?"+":""}{rule?.points}
-                            </span>
-                          </div>
-                          <div style={{paddingLeft:48}}>
-                            <ReactionBar
-                              reactions={(ep.eventReactions||{})[String(i)]||{}}
-                              onReact={(emoji)=>addReaction(ep.number,`event_${i}`,emoji)}
-                              currentUser={currentUser}
-                            />
-                          </div>
-                        </div>
-                      );
-                    }) : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic"}}>No scoring events yet.</p>}
+                          );
+                        })}
+                      </div>
+                    ) : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic"}}>No scoring events yet.</p>}
                   </div>
 
                   {/* Elimination section */}
-                  <div style={{padding:"16px 20px"}}>
+                  <div style={{padding:"12px 20px"}}>
                     <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,marginBottom:8}}>🕯️ ELIMINATED</p>
                     {epElim ? (
                       <div>
-                        <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:6,background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.15)"}}>
-                          <Portrait slug={epElimContestant?.slug} tribe={getEffectiveTribe(epElim.name)} size={32} eliminated={true}/>
-                          <div style={{flex:1}}>
-                            <span style={{color:"#F87171",fontWeight:600,fontSize:14,textDecoration:"line-through"}}>{epElim.name}</span>
-                            <span style={{color:"#A89070",fontSize:13}}> · torch snuffed</span>
-                          </div>
-                          <SkullIcon size={16}/>
+                        <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 2px"}}>
+                          <span style={{color:"#F87171",fontWeight:700,fontSize:14,textDecoration:"line-through",flexShrink:0}}>{epElim.name}</span>
+                          <span style={{color:"#A89070",fontSize:13}}>torch snuffed</span>
+                          <SkullIcon size={13}/>
                         </div>
-                        <div style={{paddingLeft:48}}>
-                          <ReactionBar
-                            reactions={ep.eliminationReactions||{}}
-                            onReact={(emoji)=>addReaction(ep.number,"elimination",emoji)}
-                            currentUser={currentUser}
-                          />
-                        </div>
+                        <ReactionBar
+                          reactions={ep.eliminationReactions||{}}
+                          onReact={(emoji)=>addReaction(ep.number,"elimination",emoji)}
+                          currentUser={currentUser}
+                        />
                       </div>
                     ) : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic"}}>No elimination recorded.</p>}
                   </div>
