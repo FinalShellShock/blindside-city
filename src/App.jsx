@@ -2,6 +2,19 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
 import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, getPortraitUrl } from "./gameData.js";
 
+const STOCK_LOGOS = [
+  { id: "torch",    label: "Torch",    url: "/logos/logo-torch.png" },
+  { id: "skull",    label: "Skull",    url: "/logos/logo-skull.png" },
+  { id: "serpent",  label: "Serpent",  url: "/logos/logo-serpent.png" },
+  { id: "lion",     label: "Lion",     url: "/logos/logo-lion.png" },
+  { id: "volcano",  label: "Volcano",  url: "/logos/logo-volcano.png" },
+  { id: "shield",   label: "Shield",   url: "/logos/logo-shield.png" },
+  { id: "eagle",    label: "Eagle",    url: "/logos/logo-eagle.png" },
+  { id: "moon",     label: "Moon",     url: "/logos/logo-moon.png" },
+  { id: "necklace", label: "Necklace", url: "/logos/logo-necklace.png" },
+  { id: "shark",    label: "Shark",    url: "/logos/logo-shark.png" },
+];
+
 // ── Dev mode: access via ?dev=torchsnuffer ──
 const DEV_PASSWORD = "torchsnuffer";
 function useDevMode() {
@@ -107,6 +120,8 @@ function App() {
   const [newTeamName, setNewTeamName] = useState("");
   const [editingMotto, setEditingMotto] = useState(null);
   const [newMotto, setNewMotto] = useState("");
+  const [editingLogo, setEditingLogo] = useState(null);
+  const [customLogoUrl, setCustomLogoUrl] = useState("");
   const [episodeRecap, setEpisodeRecap] = useState({ episode: 1, text: "" });
   const [announcementDraft, setAnnouncementDraft] = useState("");
   const [expandedTeam, setExpandedTeam] = useState(null);
@@ -190,6 +205,7 @@ function App() {
   const saveRecap = async () => { const eps=[...(appState.episodes||[])]; let ep=eps.find(e=>e.number===episodeRecap.episode); if(!ep){ep={number:episodeRecap.episode,events:[],recap:""};eps.push(ep);} ep.recap=episodeRecap.text; eps.sort((a,b)=>a.number-b.number); await saveState({...appState,episodes:eps}); };
   const renameTeam = async (old) => { if(!newTeamName.trim()||newTeamName===old){setEditingTeamName(null);return;} const teams={...appState.teams}; teams[newTeamName]={...teams[old]}; delete teams[old]; await saveState({...appState,teams}); setEditingTeamName(null); setNewTeamName(""); };
   const saveMotto = async (tn) => { const teams={...appState.teams}; if(teams[tn])teams[tn].motto=newMotto; await saveState({...appState,teams}); setEditingMotto(null); setNewMotto(""); };
+  const saveLogo = async (tn, url) => { const teams={...appState.teams}; if(teams[tn])teams[tn].logo=url; await saveState({...appState,teams}); setEditingLogo(null); setCustomLogoUrl(""); };
 
   if (loading) return (<div style={S.loadingScreen}><style>{globalStyles}</style><TorchIcon size={64}/><p style={{color:"#FF8C42",fontFamily:"'Cinzel',serif",marginTop:16,fontSize:18}}>Loading...</p></div>);
 
@@ -263,13 +279,32 @@ function App() {
                 {editingTeamName===myTeam[0]?(<div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}><input style={{...S.input,marginBottom:0,flex:1}} value={newTeamName} onChange={e=>setNewTeamName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&renameTeam(myTeam[0])} autoFocus/><button style={S.smallBtn} onClick={()=>renameTeam(myTeam[0])}>Save</button><button style={S.smallBtnGhost} onClick={()=>setEditingTeamName(null)}>Cancel</button></div>):(<h2 style={{...S.cardTitle,cursor:"pointer"}} onClick={()=>{setEditingTeamName(myTeam[0]);setNewTeamName(myTeam[0]);}}><span style={{color:"#FF8C42"}}>🔥</span> {myTeam[0]} <span style={{fontSize:12,color:"#A89070"}}>✏️</span></h2>)}
                 {editingMotto===myTeam[0]?(<div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}><input style={{...S.input,marginBottom:0,flex:1}} placeholder="Enter your team motto..." maxLength={80} value={newMotto} onChange={e=>setNewMotto(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveMotto(myTeam[0])} autoFocus/><button style={S.smallBtn} onClick={()=>saveMotto(myTeam[0])}>Save</button><button style={S.smallBtnGhost} onClick={()=>setEditingMotto(null)}>Cancel</button></div>):(<p style={{color:"#A89070",fontSize:14,fontStyle:"italic",cursor:"pointer",marginBottom:8}} onClick={()=>{setEditingMotto(myTeam[0]);setNewMotto(myTeam[1].motto||"");}}>{myTeam[1].motto||"Click to add a team motto..."}</p>)}
               </div>
+              {myTeam[1].logo&&<img src={myTeam[1].logo} alt="team logo" style={{width:72,height:72,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.3)",cursor:"pointer"}} onClick={()=>setEditingLogo(myTeam[0])}/>}
+              {!myTeam[1].logo&&<button style={{...S.smallBtnGhost,fontSize:11,padding:"6px 10px"}} onClick={()=>setEditingLogo(myTeam[0])}>+ Logo</button>}
             </div>
+            {editingLogo===myTeam[0]&&(
+              <div style={{marginTop:16,padding:16,background:"rgba(0,0,0,0.2)",borderRadius:8}}>
+                <p style={{fontFamily:"'Cinzel',serif",fontSize:13,color:"#FF8C42",marginBottom:12,letterSpacing:1}}>CHOOSE A LOGO</p>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:16}}>
+                  {STOCK_LOGOS.map(l=>(<div key={l.id} onClick={()=>saveLogo(myTeam[0],l.url)} style={{cursor:"pointer",borderRadius:8,padding:4,border:`2px solid ${myTeam[1].logo===l.url?"#FF8C42":"transparent"}`,background:"rgba(255,255,255,0.03)`,transition:"border 0.15s"}}><img src={l.url} alt={l.label} style={{width:"100%",aspectRatio:"1",borderRadius:6,display:"block"}}/><p style={{color:"#A89070",fontSize:10,textAlign:"center",marginTop:4}}>{l.label}</p></div>))}
+                </div>
+                <p style={{color:"#A89070",fontSize:12,marginBottom:6}}>Or paste a custom image URL:</p>
+                <div style={{display:"flex",gap:8}}>
+                  <input style={{...S.input,marginBottom:0,flex:1,fontSize:13}} placeholder="https://..." value={customLogoUrl} onChange={e=>setCustomLogoUrl(e.target.value)}/>
+                  <button style={S.smallBtn} onClick={()=>customLogoUrl.trim()&&saveLogo(myTeam[0],customLogoUrl.trim())}>Use</button>
+                </div>
+                <div style={{display:"flex",gap:8,marginTop:10}}>
+                  {myTeam[1].logo&&<button style={{...S.smallBtnGhost,fontSize:11}} onClick={()=>saveLogo(myTeam[0],"")}>Remove Logo</button>}
+                  <button style={{...S.smallBtnGhost,fontSize:11}} onClick={()=>setEditingLogo(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
             <p style={S.teamTotal}>{teamScores[myTeam[0]]?.total||0} <span style={{fontSize:16,opacity:0.6}}>pts</span></p>
             {teamScores[myTeam[0]]?.progression?.length>1&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><MiniChart data={teamScores[myTeam[0]].progression} width={280} height={50}/></div>}
             <div style={S.memberGrid}>{myTeam[1].members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const isE=eliminated.includes(m);return(<div key={m} style={{...S.memberCard,opacity:isE?0.5:1}}><Portrait slug={c?.slug} tribe={c?.tribe} size={40} eliminated={isE}/><div style={{flex:1}}><p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m}</p><p style={S.memberTribe}>{c?.tribe}{isE?" · Eliminated":""}</p></div><p style={S.memberScore}>{contestantScores[m]?.total||0}</p></div>);})}</div>
           </div>):(<div style={S.card}><h2 style={S.cardTitle}>No Team Yet</h2><p style={{color:"#A89070"}}>{isUserCommissioner?"Head to the Commissioner tab to set up teams.":"The commissioner hasn't set up your team yet."}</p></div>)}
           <div style={S.card}><h2 style={S.cardTitle}>Standings</h2>
-            {sortedTeams.length>0?sortedTeams.map(([name,data],i)=>(<div key={name} style={{...S.standingRow,background:myTeam&&myTeam[0]===name?"rgba(255,107,53,0.1)":"transparent",borderLeft:i===0?"3px solid #FFD93D":"3px solid transparent"}}><span style={S.standingRank}>#{i+1}</span><div style={{flex:1}}><span style={S.standingName}>{name}</span>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div><span style={S.standingOwner}>{appState.users[data.owner]?.displayName}</span><span style={S.standingScore}>{data.total}</span></div>)):<p style={{color:"#A89070"}}>No teams set up yet.</p>}
+            {sortedTeams.length>0?sortedTeams.map(([name,data],i)=>(<div key={name} style={{...S.standingRow,background:myTeam&&myTeam[0]===name?"rgba(255,107,53,0.1)":"transparent",borderLeft:i===0?"3px solid #FFD93D":"3px solid transparent"}}><span style={S.standingRank}>#{i+1}</span>{appState.teams[name]?.logo&&<img src={appState.teams[name].logo} alt="logo" style={{width:32,height:32,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.2)"}}/>}<div style={{flex:1}}><span style={S.standingName}>{name}</span>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div><span style={S.standingOwner}>{appState.users[data.owner]?.displayName}</span><span style={S.standingScore}>{data.total}</span></div>)):<p style={{color:"#A89070"}}>No teams set up yet.</p>}
           </div>
           {appState.episodes.filter(ep=>ep.recap).length>0&&(<div style={S.card}><h2 style={S.cardTitle}>Episode Recaps</h2>{[...appState.episodes].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number).slice(0,3).map(ep=>(<div key={ep.number} style={{marginBottom:16,padding:12,background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:"3px solid #FF8C42"}}><p style={S.epLabel}>Episode {ep.number}</p><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.5}}>{ep.recap}</p></div>))}</div>)}
           {appState.episodes.length>0&&(<div style={S.card}><h2 style={S.cardTitle}>Latest Events</h2>{[...appState.episodes].sort((a,b)=>b.number-a.number).slice(0,3).map(ep=>(<div key={ep.number} style={{marginBottom:16}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={S.eventRow}><span style={{...S.eventContestant,textDecoration:eliminated.includes(ev.contestant)?"line-through":"none"}}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span></div>))}</div>))}</div>)}
@@ -280,7 +315,7 @@ function App() {
           <div style={S.card}><h2 style={S.cardTitle}>Team Leaderboard</h2>
             {sortedTeams.map(([name,data],i)=>(<div key={name} style={S.leaderboardCard} onClick={()=>setExpandedTeam(expandedTeam===name?null:name)}>
               <div style={S.leaderboardHeader}>
-                <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{...S.rankBadge,background:i===0?"linear-gradient(135deg,#FFD93D,#FF8C42)":i===1?"linear-gradient(135deg,#C0C0C0,#A0A0A0)":i===2?"linear-gradient(135deg,#CD7F32,#A0622E)":"#3D3020"}}>{i+1}</span><div><p style={S.lbTeamName}>{name}</p><p style={S.lbOwner}>{appState.users[data.owner]?.displayName}</p>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div></div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{...S.rankBadge,background:i===0?"linear-gradient(135deg,#FFD93D,#FF8C42)":i===1?"linear-gradient(135deg,#C0C0C0,#A0A0A0)":i===2?"linear-gradient(135deg,#CD7F32,#A0622E)":"#3D3020"}}>{i+1}</span>{appState.teams[name]?.logo&&<img src={appState.teams[name].logo} alt="logo" style={{width:44,height:44,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.3)"}}/>}<div><p style={S.lbTeamName}>{name}</p><p style={S.lbOwner}>{appState.users[data.owner]?.displayName}</p>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div></div>
                 <div style={{textAlign:"right"}}><p style={S.lbTotal}>{data.total}</p>{data.progression?.length>1&&<MiniChart data={data.progression} width={120} height={30}/>}</div>
               </div>
               {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=eliminated.includes(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:TRIBE_COLORS[c?.tribe]||"#666"}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
