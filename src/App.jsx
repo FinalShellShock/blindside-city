@@ -105,15 +105,17 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
 
   return (
     <div style={{ marginTop: 6 }}>
-      {/* Names appear ABOVE the pills so the thumb doesn't cover them on mobile */}
-      {activeEmoji && (reactions[activeEmoji] || []).length > 0 && (
-        <div style={{
-          fontSize: 11, color: "#A89070", marginBottom: 4, paddingLeft: 2,
-          fontFamily: "'Crimson Pro',serif", fontStyle: "italic",
-        }}>
-          {activeEmoji} {getNames(reactions[activeEmoji])}
-        </div>
-      )}
+      {/* Fixed-height name label — always reserves space so pills never shift on hover */}
+      <div style={{ minHeight: 16, marginBottom: 2, paddingLeft: 2 }}>
+        {activeEmoji && (reactions[activeEmoji] || []).length > 0 && (
+          <span style={{
+            fontSize: 11, color: "#A89070",
+            fontFamily: "'Crimson Pro',serif", fontStyle: "italic",
+          }}>
+            {activeEmoji} {getNames(reactions[activeEmoji])}
+          </span>
+        )}
+      </div>
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
         {activeEmojis.map(emoji => {
           const userKeys = reactions[emoji] || [];
