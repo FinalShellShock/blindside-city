@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
 import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, getPortraitUrl } from "./gameData.js";
 
@@ -15,19 +15,33 @@ const STOCK_LOGOS = [
   { id: "shark",    label: "Shark",    url: "/logos/logo-shark.jpg" },
 ];
 
-// All possible tribe labels (starting tribes + Merged + any custom)
+const REACTION_EMOJIS = ["🔥", "👑", "💀", "😤", "😂", "❤️"];
+
+// Starting tribes from gameData + Merged
 const STARTING_TRIBES = Object.keys(TRIBE_COLORS);
 const ALL_TRIBE_OPTIONS = [...STARTING_TRIBES, "Merged"];
-// Color for merged tribe
 const MERGED_COLOR = "#FFD93D";
 
-// Returns effective tribe color (merged or original)
 function tribeColor(tribe) {
   if (tribe === "Merged") return MERGED_COLOR;
   return TRIBE_COLORS[tribe] || "#666";
 }
 
-// ── Dev mode: access via ?dev=torchsnuffer ──
+// ── Migration helper: eliminated may be old string[] or new {name,episode}[]
+function normEliminated(eliminated) {
+  return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
+}
+function isElim(eliminated, name) {
+  return normEliminated(eliminated).some(e => e.name === name);
+}
+function elimNames(eliminated) {
+  return normEliminated(eliminated).map(e => e.name);
+}
+function elimEpisode(eliminated, name) {
+  return normEliminated(eliminated).find(e => e.name === name)?.episode || null;
+}
+
+// ── Dev mode ──
 const DEV_PASSWORD = "torchsnuffer";
 function useDevMode() {
   const [active, setActive] = useState(false);
@@ -38,7 +52,7 @@ function useDevMode() {
   return active;
 }
 
-// ── Portrait with fallback ──
+// ── Portrait ──
 function Portrait({ slug, tribe, size = 36, eliminated = false }) {
   const [failed, setFailed] = useState(false);
   if (failed || !slug) {
@@ -53,6 +67,30 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
     <img src={getPortraitUrl(slug)} alt={slug} onError={() => setFailed(true)}
       style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${tribeColor(tribe)}`, filter: eliminated ? "grayscale(100%)" : "none" }}
     />
+  );
+}
+
+// ── Reaction Bar ──
+function ReactionBar({ reactions = {}, onReact, currentUser }) {
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+      {REACTION_EMOJIS.map(emoji => {
+        const users = reactions[emoji] || [];
+        const reacted = users.includes(currentUser);
+        const count = users.length;
+        return (
+          <button key={emoji} onClick={() => onReact(emoji)} style={{
+            padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
+            background: reacted ? "rgba(255,140,66,0.2)" : "rgba(255,255,255,0.04)",
+            border: reacted ? "1px solid rgba(255,140,66,0.5)" : "1px solid rgba(255,255,255,0.08)",
+            color: reacted ? "#FF8C42" : "#A89070",
+            display: "flex", alignItems: "center", gap: 4, transition: "all 0.12s",
+          }}>
+            {emoji}{count > 0 && <span style={{ fontSize: 12, fontWeight: 600 }}>{count}</span>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -120,8 +158,10 @@ function App() {
   const [announcementDraft, setAnnouncementDraft] = useState("");
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [expandedCast, setExpandedCast] = useState(null);
-  const [expandedRecap, setExpandedRecap] = useState(null);
   const [expandedMember, setExpandedMember] = useState(null);
+  // Elimination: which contestant is pending episode # input
+  const [elimPending, setElimPending] = useState(null); // contestant name
+  const [elimEpInput, setElimEpInput] = useState(1);
 
   // Restore saved session
   useEffect(() => {
@@ -129,14 +169,13 @@ function App() {
     if (saved) setCurrentUser(saved);
   }, []);
 
-  // Load initial state + real-time sync
   useEffect(() => {
     let unsubscribe;
     async function init() {
       try {
         const initial = await loadState();
         setAppState(initial || DEFAULT_STATE);
-        unsubscribe = subscribeToState((newState) => { setAppState(newState); });
+        unsubscribe = subscribeToState((ns) => setAppState(ns));
       } catch (err) {
         console.error("Firebase load error:", err);
         setAppState(DEFAULT_STATE);
@@ -173,7 +212,6 @@ function App() {
   const isUserCommissioner = currentUser && (appState?.commissioners||[]).includes(currentUser);
   const getUserTeam = (u) => Object.entries(appState?.teams||{}).find(([_,t])=>t.owner===u);
 
-  // Returns effective (current) tribe for a contestant — checks tribeOverrides first
   const getEffectiveTribe = (name) => {
     const overrides = appState?.tribeOverrides || {};
     return overrides[name] || CONTESTANTS.find(c => c.name === name)?.tribe || "Unknown";
@@ -195,32 +233,112 @@ function App() {
     }); return ts;
   };
 
-  const addEvent = async () => { if(!eventForm.contestants.length||!eventForm.event) return; const eps=[...(appState.episodes||[])]; let ep=eps.find(e=>e.number===eventForm.episode); if(!ep){ep={number:eventForm.episode,events:[],recap:""};eps.push(ep);} eventForm.contestants.forEach(c=>ep.events.push({contestant:c,type:eventForm.event})); eps.sort((a,b)=>a.number-b.number); await saveState({...appState,episodes:eps}); setEventForm({...eventForm,contestants:[],event:""}); };
-  const removeEvent = async (en,ei) => { const eps=[...(appState.episodes||[])]; const ep=eps.find(e=>e.number===en); if(ep){ep.events.splice(ei,1); await saveState({...appState,episodes:eps});} };
-  const saveTeam = async () => { if(!teamDraft.teamName.trim()||teamDraft.members.length===0||!teamDraft.editOwner) return; const teams={...appState.teams}; if(teamDraft.editKey&&teamDraft.editKey!==teamDraft.teamName) delete teams[teamDraft.editKey]; teams[teamDraft.teamName]={owner:teamDraft.editOwner,members:teamDraft.members,motto:teams[teamDraft.editKey]?.motto||teams[teamDraft.teamName]?.motto||""}; await saveState({...appState,teams}); setTeamDraft({teamName:"",members:[],editOwner:null,editKey:null}); };
+  const addEvent = async () => {
+    if(!eventForm.contestants.length||!eventForm.event) return;
+    const eps=[...(appState.episodes||[])];
+    let ep=eps.find(e=>e.number===eventForm.episode);
+    if(!ep){ep={number:eventForm.episode,events:[],recap:""};eps.push(ep);}
+    eventForm.contestants.forEach(c=>ep.events.push({contestant:c,type:eventForm.event}));
+    eps.sort((a,b)=>a.number-b.number);
+    await saveState({...appState,episodes:eps});
+    setEventForm({...eventForm,contestants:[],event:""});
+  };
+
+  const removeEvent = async (en,ei) => {
+    const eps=[...(appState.episodes||[])];
+    const ep=eps.find(e=>e.number===en);
+    if(ep){ep.events.splice(ei,1); await saveState({...appState,episodes:eps});}
+  };
+
+  const saveTeam = async () => {
+    if(!teamDraft.teamName.trim()||teamDraft.members.length===0||!teamDraft.editOwner) return;
+    const teams={...appState.teams};
+    if(teamDraft.editKey&&teamDraft.editKey!==teamDraft.teamName) delete teams[teamDraft.editKey];
+    teams[teamDraft.teamName]={owner:teamDraft.editOwner,members:teamDraft.members,motto:teams[teamDraft.editKey]?.motto||teams[teamDraft.teamName]?.motto||""};
+    await saveState({...appState,teams});
+    setTeamDraft({teamName:"",members:[],editOwner:null,editKey:null});
+  };
+
   const deleteTeam = async (tn) => { const teams={...appState.teams}; delete teams[tn]; await saveState({...appState,teams}); };
-  const toggleEliminated = async (name) => { const e=[...(appState.eliminated||[])]; const i=e.indexOf(name); if(i>=0)e.splice(i,1);else e.push(name); await saveState({...appState,eliminated:e}); };
+
+  // Elimination: episode-aware
+  const confirmEliminate = async (name, episode) => {
+    const current = normEliminated(appState.eliminated);
+    current.push({ name, episode: parseInt(episode) || null });
+    await saveState({ ...appState, eliminated: current });
+    setElimPending(null);
+  };
+  const unEliminate = async (name) => {
+    const current = normEliminated(appState.eliminated).filter(e => e.name !== name);
+    await saveState({ ...appState, eliminated: current });
+  };
+
   const toggleCommissioner = async (u) => { const c=[...(appState.commissioners||[])]; const i=c.indexOf(u); if(i>=0)c.splice(i,1);else c.push(u); await saveState({...appState,commissioners:c}); };
-  const saveRecap = async () => { const eps=[...(appState.episodes||[])]; let ep=eps.find(e=>e.number===episodeRecap.episode); if(!ep){ep={number:episodeRecap.episode,events:[],recap:""};eps.push(ep);} ep.recap=episodeRecap.text; eps.sort((a,b)=>a.number-b.number); await saveState({...appState,episodes:eps}); };
-  const renameTeam = async (old) => { if(!newTeamName.trim()||newTeamName===old){setEditingTeamName(null);return;} const teams={...appState.teams}; teams[newTeamName]={...teams[old]}; delete teams[old]; await saveState({...appState,teams}); setEditingTeamName(null); setNewTeamName(""); };
+
+  const saveRecap = async () => {
+    const eps=[...(appState.episodes||[])];
+    let ep=eps.find(e=>e.number===episodeRecap.episode);
+    if(!ep){ep={number:episodeRecap.episode,events:[],recap:""};eps.push(ep);}
+    ep.recap=episodeRecap.text;
+    eps.sort((a,b)=>a.number-b.number);
+    await saveState({...appState,episodes:eps});
+  };
+
+  const renameTeam = async (old) => {
+    if(!newTeamName.trim()||newTeamName===old){setEditingTeamName(null);return;}
+    const teams={...appState.teams}; teams[newTeamName]={...teams[old]}; delete teams[old];
+    await saveState({...appState,teams}); setEditingTeamName(null); setNewTeamName("");
+  };
   const saveMotto = async (tn) => { const teams={...appState.teams}; if(teams[tn])teams[tn].motto=newMotto; await saveState({...appState,teams}); setEditingMotto(null); setNewMotto(""); };
   const saveLogo = async (tn, url) => { const teams={...appState.teams}; if(teams[tn])teams[tn].logo=url; await saveState({...appState,teams}); setEditingLogo(null); setCustomLogoUrl(""); };
 
-  // Update a contestant's current tribe
   const setContestantTribe = async (contestantName, newTribe) => {
     const overrides = { ...(appState.tribeOverrides || {}) };
     const original = CONTESTANTS.find(c => c.name === contestantName)?.tribe;
-    if (newTribe === original) {
-      delete overrides[contestantName]; // back to original, no need to store
-    } else {
-      overrides[contestantName] = newTribe;
-    }
+    if (newTribe === original) { delete overrides[contestantName]; }
+    else { overrides[contestantName] = newTribe; }
     await saveState({ ...appState, tribeOverrides: overrides });
+  };
+
+  // Reactions: toggle current user on/off for a given emoji on a given target within an episode
+  // target: "recap" | "elimination" | "event_N"
+  const addReaction = async (episodeNum, target, emoji) => {
+    if (!currentUser) return;
+    const eps = [...(appState.episodes || [])];
+    let ep = eps.find(e => e.number === episodeNum);
+    if (!ep) return;
+
+    // Clone episode deeply enough
+    ep = { ...ep };
+    eps[eps.findIndex(e => e.number === episodeNum)] = ep;
+
+    let reactionField;
+    if (target === "recap") {
+      ep.recapReactions = { ...(ep.recapReactions || {}) };
+      reactionField = ep.recapReactions;
+    } else if (target === "elimination") {
+      ep.eliminationReactions = { ...(ep.eliminationReactions || {}) };
+      reactionField = ep.eliminationReactions;
+    } else {
+      // event_N
+      const idx = target.replace("event_", "");
+      ep.eventReactions = { ...(ep.eventReactions || {}) };
+      ep.eventReactions[idx] = { ...(ep.eventReactions[idx] || {}) };
+      reactionField = ep.eventReactions[idx];
+    }
+
+    const users = [...(reactionField[emoji] || [])];
+    const myIdx = users.indexOf(currentUser);
+    if (myIdx >= 0) { users.splice(myIdx, 1); } // toggle off
+    else { users.push(currentUser); }             // toggle on
+    reactionField[emoji] = users;
+
+    await saveState({ ...appState, episodes: eps });
   };
 
   if (loading) return (<div style={S.loadingScreen}><style>{globalStyles}</style><TorchIcon size={64}/><p style={{color:"#FF8C42",fontFamily:"'Cinzel',serif",marginTop:16,fontSize:18}}>Loading...</p></div>);
 
-  // LOGIN
+  // ── Login ──
   if (view === "login" && !devMode) {
     return (
       <div style={S.loginScreen}><style>{globalStyles}</style><FireParticles/>
@@ -262,13 +380,27 @@ function App() {
     );
   }
 
+  // ── Computed ──
   const contestantScores = getContestantScores();
   const teamScores = getTeamScores();
   const sortedTeams = Object.entries(teamScores).sort((a,b)=>b[1].total-a[1].total);
   const myTeam = getUserTeam(currentUser);
   const eliminated = appState.eliminated || [];
   const tribeOverrides = appState.tribeOverrides || {};
-  const postedRecaps = [...(appState.episodes||[])].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number);
+
+  // Episode feed: any episode with at least one piece of data, newest first
+  const feedEpisodes = [...(appState.episodes||[])]
+    .filter(ep => ep.recap || (ep.events||[]).length > 0 || normEliminated(eliminated).some(e=>e.episode===ep.number))
+    .sort((a,b)=>b.number-a.number);
+
+  // Also include episodes where someone was eliminated but no episode object exists yet
+  const elimsWithEpisodes = normEliminated(eliminated).filter(e => e.episode);
+  elimsWithEpisodes.forEach(elim => {
+    if (!feedEpisodes.find(ep => ep.number === elim.episode)) {
+      feedEpisodes.push({ number: elim.episode, events: [], recap: "" });
+    }
+  });
+  feedEpisodes.sort((a,b)=>b.number-a.number);
 
   // ── Commissioner sub-tabs ──
   const commishTabs = [
@@ -300,10 +432,14 @@ function App() {
 
         {/* ── HOME ── */}
         {view==="home"&&(<div>
+
+          {/* Commissioner announcement */}
           {appState.announcement&&(<div style={{...S.card,borderColor:"rgba(255,217,61,0.2)",background:"rgba(255,217,61,0.05)",marginBottom:20}}>
             <p style={{fontFamily:"'Cinzel',serif",fontSize:12,color:"#FFD93D",letterSpacing:2,marginBottom:6}}>📣 COMMISSIONER MESSAGE</p>
             <p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.6}}>{appState.announcement}</p>
           </div>)}
+
+          {/* Standings */}
           <div style={S.card}>
             <h2 style={S.cardTitle}>Standings</h2>
             {sortedTeams.length>0?sortedTeams.map(([name,data],i)=>(
@@ -318,18 +454,103 @@ function App() {
               </div>
             )):<p style={{color:"#A89070"}}>No teams yet.</p>}
           </div>
-          {postedRecaps.length>0&&(<div style={S.card}>
-            <h2 style={S.cardTitle}>Episode Recaps</h2>
-            {postedRecaps.map(ep=>(
-              <div key={ep.number} style={{marginBottom:8,borderRadius:8,border:"1px solid rgba(255,140,66,0.1)",overflow:"hidden"}}>
-                <div onClick={()=>setExpandedRecap(expandedRecap===ep.number?null:ep.number)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"rgba(255,255,255,0.03)",cursor:"pointer"}}>
-                  <p style={{fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,color:"#FF8C42",letterSpacing:1}}>Episode {ep.number}</p>
-                  <span style={{color:"#A89070",fontSize:11,transform:expandedRecap===ep.number?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▼</span>
+
+          {/* Episode Feed */}
+          {feedEpisodes.length > 0 && (<div>
+            <h2 style={{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:"#FFD93D",marginBottom:12,letterSpacing:1}}>Episode Feed</h2>
+            {feedEpisodes.map(ep => {
+              const epElim = normEliminated(eliminated).find(e => e.episode === ep.number);
+              const epElimContestant = epElim ? CONTESTANTS.find(c => c.name === epElim.name) : null;
+              const epEvents = ep.events || [];
+
+              return (
+                <div key={ep.number} style={{...S.card, padding:0, overflow:"hidden", marginBottom:16}}>
+                  {/* Episode header */}
+                  <div style={{padding:"14px 20px",background:"rgba(255,107,53,0.08)",borderBottom:"1px solid rgba(255,140,66,0.12)"}}>
+                    <p style={{fontFamily:"'Cinzel',serif",fontSize:16,fontWeight:700,color:"#FF8C42",letterSpacing:2}}>EPISODE {ep.number}</p>
+                  </div>
+
+                  {/* Recap section */}
+                  <div style={{padding:"16px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,marginBottom:8}}>📖 RECAP</p>
+                    {ep.recap
+                      ? <p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.6}}>{ep.recap}</p>
+                      : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic"}}>No recap posted yet.</p>
+                    }
+                    {ep.recap && (
+                      <ReactionBar
+                        reactions={ep.recapReactions||{}}
+                        onReact={(emoji)=>addReaction(ep.number,"recap",emoji)}
+                        currentUser={currentUser}
+                      />
+                    )}
+                  </div>
+
+                  {/* Scoring events section */}
+                  <div style={{padding:"16px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,marginBottom:8}}>⚡ SCORING EVENTS</p>
+                    {epEvents.length > 0 ? epEvents.map((ev, i) => {
+                      const rule = SCORING_RULES[ev.type];
+                      const c = CONTESTANTS.find(x => x.name === ev.contestant);
+                      const curTribe = getEffectiveTribe(ev.contestant);
+                      return (
+                        <div key={i} style={{marginBottom:8}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:6,background:"rgba(255,255,255,0.02)",borderLeft:`2px solid ${tribeColor(curTribe)}`}}>
+                            <Portrait slug={c?.slug} tribe={curTribe} size={28} eliminated={isElim(eliminated,ev.contestant)}/>
+                            <div style={{flex:1}}>
+                              <span style={{color:"#E8D5B5",fontWeight:600,fontSize:14}}>{ev.contestant}</span>
+                              <span style={{color:"#A89070",fontSize:13}}> · {rule?.label}</span>
+                            </div>
+                            <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:14,color:rule?.points>=0?"#4ADE80":"#F87171"}}>
+                              {rule?.points>0?"+":""}{rule?.points}
+                            </span>
+                          </div>
+                          <div style={{paddingLeft:48}}>
+                            <ReactionBar
+                              reactions={(ep.eventReactions||{})[String(i)]||{}}
+                              onReact={(emoji)=>addReaction(ep.number,`event_${i}`,emoji)}
+                              currentUser={currentUser}
+                            />
+                          </div>
+                        </div>
+                      );
+                    }) : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic"}}>No scoring events yet.</p>}
+                  </div>
+
+                  {/* Elimination section */}
+                  <div style={{padding:"16px 20px"}}>
+                    <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,marginBottom:8}}>🕯️ ELIMINATED</p>
+                    {epElim ? (
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:6,background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.15)"}}>
+                          <Portrait slug={epElimContestant?.slug} tribe={getEffectiveTribe(epElim.name)} size={32} eliminated={true}/>
+                          <div style={{flex:1}}>
+                            <span style={{color:"#F87171",fontWeight:600,fontSize:14,textDecoration:"line-through"}}>{epElim.name}</span>
+                            <span style={{color:"#A89070",fontSize:13}}> · torch snuffed</span>
+                          </div>
+                          <SkullIcon size={16}/>
+                        </div>
+                        <div style={{paddingLeft:48}}>
+                          <ReactionBar
+                            reactions={ep.eliminationReactions||{}}
+                            onReact={(emoji)=>addReaction(ep.number,"elimination",emoji)}
+                            currentUser={currentUser}
+                          />
+                        </div>
+                      </div>
+                    ) : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic"}}>No elimination recorded.</p>}
+                  </div>
                 </div>
-                {expandedRecap===ep.number&&(<div style={{padding:"12px 16px",background:"rgba(42,26,10,0.4)",borderTop:"1px solid rgba(255,140,66,0.08)"}}><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.6}}>{ep.recap}</p></div>)}
-              </div>
-            ))}
+              );
+            })}
           </div>)}
+
+          {feedEpisodes.length === 0 && (
+            <div style={{...S.card,textAlign:"center",padding:40}}>
+              <p style={{fontSize:32,marginBottom:12}}>🌴</p>
+              <p style={{color:"#A89070",fontSize:15}}>The season hasn't started yet. Check back after the premiere!</p>
+            </div>
+          )}
         </div>)}
 
         {/* ── MY TEAM ── */}
@@ -367,34 +588,26 @@ function App() {
             )}
             <p style={S.teamTotal}>{teamScores[myTeam[0]]?.total||0} <span style={{fontSize:16,opacity:0.6}}>pts</span></p>
             {teamScores[myTeam[0]]?.progression?.length>1&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><MiniChart data={teamScores[myTeam[0]].progression} width={280} height={50}/></div>}
-
-            {/* Member cards with expandable event breakdown */}
             <div style={S.memberGrid}>
               {myTeam[1].members.map(m=>{
-                const c = CONTESTANTS.find(x=>x.name===m);
-                const isE = eliminated.includes(m);
-                const currentTribe = getEffectiveTribe(m);
-                const originalTribe = c?.tribe;
-                const tribeChanged = tribeOverrides[m] && tribeOverrides[m] !== originalTribe;
-                const memberEvents = contestantScores[m]?.events || [];
-                const isExpanded = expandedMember === m;
-                // Group events by episode
-                const byEp = {};
-                memberEvents.forEach(ev => { if(!byEp[ev.episode]) byEp[ev.episode]=[]; byEp[ev.episode].push(ev); });
-
-                return (
+                const c=CONTESTANTS.find(x=>x.name===m);
+                const isE=isElim(eliminated,m);
+                const currentTribe=getEffectiveTribe(m);
+                const tribeChanged=tribeOverrides[m]&&tribeOverrides[m]!==c?.tribe;
+                const memberEvents=contestantScores[m]?.events||[];
+                const isExpanded=expandedMember===m;
+                const byEp={};
+                memberEvents.forEach(ev=>{if(!byEp[ev.episode])byEp[ev.episode]=[];byEp[ev.episode].push(ev);});
+                return(
                   <div key={m} style={{borderRadius:8,overflow:"hidden",border:"1px solid rgba(255,255,255,0.05)"}}>
-                    {/* Main row — click to expand */}
                     <div onClick={()=>setExpandedMember(isExpanded?null:m)} style={{...S.memberCard,cursor:"pointer",background:isExpanded?"rgba(255,140,66,0.07)":"rgba(255,255,255,0.03)",opacity:isE?0.6:1}}>
                       <Portrait slug={c?.slug} tribe={currentTribe} size={40} eliminated={isE}/>
                       <div style={{flex:1}}>
                         <p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m} {isE&&<SkullIcon size={12}/>}</p>
                         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:2}}>
-                          {/* Current tribe badge */}
                           <span style={{fontSize:11,padding:"1px 7px",borderRadius:3,background:tribeColor(currentTribe)+"33",color:tribeColor(currentTribe),fontWeight:700}}>{currentTribe}</span>
-                          {/* Show original tribe if swapped */}
-                          {tribeChanged&&<span style={{fontSize:11,color:"#A89070",textDecoration:"line-through"}}>{originalTribe}</span>}
-                          {isE&&<span style={{fontSize:11,color:"#F87171"}}>· Eliminated</span>}
+                          {tribeChanged&&<span style={{fontSize:11,color:"#A89070",textDecoration:"line-through"}}>{c?.tribe}</span>}
+                          {isE&&<span style={{fontSize:11,color:"#F87171"}}>· Elim. Ep {elimEpisode(eliminated,m)||"?"}</span>}
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -402,8 +615,6 @@ function App() {
                         <span style={{color:"#A89070",fontSize:11,transform:isExpanded?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▼</span>
                       </div>
                     </div>
-
-                    {/* Expanded event breakdown */}
                     {isExpanded&&(
                       <div style={{padding:"12px 16px",background:"rgba(42,26,10,0.5)",borderTop:"1px solid rgba(255,140,66,0.08)"}}>
                         {memberEvents.length>0?(
@@ -446,7 +657,7 @@ function App() {
                 </div>
                 <div style={{textAlign:"right"}}><p style={S.lbTotal}>{data.total}</p>{data.progression?.length>1&&<MiniChart data={data.progression} width={120} height={30}/>}</div>
               </div>
-              {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=eliminated.includes(member);const curTribe=getEffectiveTribe(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:tribeColor(curTribe)}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
+              {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=isElim(eliminated,member);const curTribe=getEffectiveTribe(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:tribeColor(curTribe)}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
             </div>))}
             {sortedTeams.length===0&&<p style={{color:"#A89070"}}>No teams yet.</p>}
           </div>
@@ -459,13 +670,14 @@ function App() {
             <p style={{color:"#A89070",fontSize:13,marginBottom:16}}>Sorted by points · tap a player to see their scoring breakdown</p>
             <div style={{display:"grid",gap:6}}>
               {[...CONTESTANTS].sort((a,b)=>(contestantScores[b.name]?.total||0)-(contestantScores[a.name]?.total||0)).map((c,i)=>{
-                const isE=eliminated.includes(c.name);
+                const isE=isElim(eliminated,c.name);
                 const owner=Object.entries(appState.teams||{}).find(([_,t])=>t.members.includes(c.name));
                 const score=contestantScores[c.name]?.total||0;
                 const events=contestantScores[c.name]?.events||[];
                 const isExpanded=expandedCast===c.name;
-                const currentTribe = getEffectiveTribe(c.name);
-                const tribeChanged = tribeOverrides[c.name] && tribeOverrides[c.name] !== c.tribe;
+                const currentTribe=getEffectiveTribe(c.name);
+                const tribeChanged=tribeOverrides[c.name]&&tribeOverrides[c.name]!==c.tribe;
+                const epNum = elimEpisode(eliminated, c.name);
                 return(
                   <div key={c.name}>
                     <div onClick={()=>setExpandedCast(isExpanded?null:c.name)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:isExpanded?"rgba(255,140,66,0.08)":"rgba(255,255,255,0.02)",cursor:"pointer",borderLeft:`3px solid ${tribeColor(currentTribe)}`,opacity:isE?0.55:1,transition:"background 0.15s"}}>
@@ -479,6 +691,7 @@ function App() {
                         <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
                           <span style={{fontSize:11,padding:"1px 6px",borderRadius:3,background:tribeColor(currentTribe)+"22",color:tribeColor(currentTribe),fontWeight:600}}>{currentTribe}</span>
                           {tribeChanged&&<span style={{fontSize:11,color:"#A89070",textDecoration:"line-through"}}>{c.tribe}</span>}
+                          {isE&&epNum&&<span style={{fontSize:11,color:"#F87171"}}>· Elim. Ep {epNum}</span>}
                           {owner&&<span style={{fontSize:11,color:"#A89070"}}>· {owner[0]}</span>}
                         </div>
                       </div>
@@ -512,17 +725,14 @@ function App() {
         {/* ── COMMISSIONER ── */}
         {view==="admin"&&(isUserCommissioner||devMode)&&(<div style={{display:"flex",gap:20,alignItems:"flex-start"}}>
 
-          {/* Left sidebar — desktop */}
           <div className="commish-sidebar" style={S.commishSidebar}>
             {commishTabs.map(t=>(<button key={t.id} onClick={()=>setCommishTab(t.id)} style={{...S.commishSideBtn,...(commishTab===t.id?S.commishSideBtnActive:{})}}>{t.label}</button>))}
           </div>
 
-          {/* Mobile tabs */}
           <div className="commish-mobile-tabs" style={S.commishMobileTabs}>
             {commishTabs.map(t=>(<button key={t.id} onClick={()=>setCommishTab(t.id)} style={{...S.commishMobileTab,...(commishTab===t.id?S.commishMobileTabActive:{})}}>{t.label}</button>))}
           </div>
 
-          {/* Content */}
           <div style={{flex:1,minWidth:0}}>
 
             {/* UPDATE SCORING */}
@@ -543,13 +753,13 @@ function App() {
                 <div style={S.formRow}>
                   <label style={S.formLabel}>Contestants ({eventForm.contestants.length} selected — tap to select/deselect)</label>
                   <div style={S.contestantPicker}>
-                    {CONTESTANTS.filter(c=>!eliminated.includes(c.name)).map(c=>{
+                    {CONTESTANTS.filter(c=>!isElim(eliminated,c.name)).map(c=>{
                       const sel=eventForm.contestants.includes(c.name);
                       return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?tribeColor(getEffectiveTribe(c.name)):"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?tribeColor(getEffectiveTribe(c.name)):"rgba(255,255,255,0.1)",fontWeight:sel?700:400}}>{c.name}</button>);
                     })}
-                    {eliminated.length>0&&(<>
+                    {elimNames(eliminated).length>0&&(<>
                       <div style={{width:"100%",borderTop:"1px solid rgba(255,255,255,0.06)",margin:"6px 0"}}/>
-                      {CONTESTANTS.filter(c=>eliminated.includes(c.name)).map(c=>{
+                      {CONTESTANTS.filter(c=>isElim(eliminated,c.name)).map(c=>{
                         const sel=eventForm.contestants.includes(c.name);
                         return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?"rgba(248,113,113,0.3)":"rgba(255,255,255,0.03)",color:sel?"#F87171":"#555",borderColor:sel?"rgba(248,113,113,0.5)":"rgba(255,255,255,0.06)",textDecoration:"line-through"}}>☠ {c.name}</button>);
                       })}
@@ -570,31 +780,63 @@ function App() {
             {commishTab==="recaps"&&(<div>
               <div style={S.card}>
                 <h2 style={S.cardTitle}>Episode Recap</h2>
-                <p style={{color:"#A89070",fontSize:13,marginBottom:16}}>Recaps are visible to all players on the Home page once saved.</p>
+                <p style={{color:"#A89070",fontSize:13,marginBottom:16}}>Recaps appear on the Home page episode feed once saved.</p>
                 <div style={S.formRow}><label style={S.formLabel}>Episode #</label><input type="number" min="1" max="20" value={episodeRecap.episode} onChange={e=>setEpisodeRecap({...episodeRecap,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/></div>
                 <textarea style={{...S.input,minHeight:120,resize:"vertical"}} placeholder="What happened this episode..." value={episodeRecap.text} onChange={e=>setEpisodeRecap({...episodeRecap,text:e.target.value})}/>
                 <button style={S.primaryBtn} onClick={saveRecap}>Save Recap</button>
               </div>
-              {postedRecaps.length>0&&(<div style={S.card}>
+              {[...(appState.episodes||[])].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number).length>0&&(<div style={S.card}>
                 <h2 style={S.cardTitle}>Posted Recaps</h2>
-                {postedRecaps.map(ep=>(<div key={ep.number} style={{marginBottom:16,padding:12,background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:"3px solid #FF8C42"}}><p style={S.epLabel}>Episode {ep.number}</p><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.5}}>{ep.recap}</p></div>))}
+                {[...(appState.episodes||[])].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:16,padding:12,background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:"3px solid #FF8C42"}}><p style={S.epLabel}>Episode {ep.number}</p><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.5}}>{ep.recap}</p></div>))}
               </div>)}
             </div>)}
 
             {/* CAST & TRIBES */}
             {commishTab==="cast"&&(<div>
-              {/* Elimination Tracker */}
+
+              {/* Elimination Tracker — episode-aware */}
               <div style={S.card}>
                 <h2 style={S.cardTitle}>Elimination Tracker</h2>
-                <p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Tap a contestant to toggle their elimination status.</p>
-                <div style={S.contestantPicker}>
+                <p style={{color:"#A89070",fontSize:13,marginBottom:16}}>Tap a contestant to mark them eliminated. You'll be asked which episode.</p>
+                <div style={{display:"grid",gap:8}}>
                   {CONTESTANTS.map(c=>{
-                    const isE=eliminated.includes(c.name);
+                    const isE=isElim(eliminated,c.name);
+                    const epNum=elimEpisode(eliminated,c.name);
                     const curTribe=getEffectiveTribe(c.name);
-                    return(
-                      <button key={c.name} onClick={()=>toggleEliminated(c.name)} style={{...S.contestantChip,background:isE?"rgba(248,113,113,0.2)":tribeColor(curTribe)+"22",color:isE?"#F87171":tribeColor(curTribe),borderColor:isE?"rgba(248,113,113,0.4)":tribeColor(curTribe)+"66",textDecoration:isE?"line-through":"none"}}>
-                        {isE&&"☠ "}{c.name}
-                      </button>
+                    const isPending=elimPending===c.name;
+
+                    if (isE) {
+                      return (
+                        <div key={c.name} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.15)"}}>
+                          <Portrait slug={c.slug} tribe={curTribe} size={32} eliminated={true}/>
+                          <div style={{flex:1}}>
+                            <span style={{color:"#F87171",fontWeight:600,textDecoration:"line-through"}}>{c.name}</span>
+                            {epNum&&<span style={{color:"#A89070",fontSize:12,marginLeft:8}}>Ep {epNum}</span>}
+                          </div>
+                          <button onClick={()=>unEliminate(c.name)} style={{...S.smallBtnGhost,fontSize:12,color:"#F87171",borderColor:"rgba(248,113,113,0.3)"}}>Un-eliminate</button>
+                        </div>
+                      );
+                    }
+
+                    if (isPending) {
+                      return (
+                        <div key={c.name} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"rgba(255,140,66,0.06)",border:"1px solid rgba(255,140,66,0.2)"}}>
+                          <Portrait slug={c.slug} tribe={curTribe} size={32}/>
+                          <span style={{color:"#E8D5B5",fontWeight:600,flex:1}}>{c.name}</span>
+                          <label style={{color:"#A89070",fontSize:13,marginRight:4}}>Episode:</label>
+                          <input type="number" min="1" max="20" value={elimEpInput} onChange={e=>setElimEpInput(e.target.value)} style={{...S.input,width:64,marginBottom:0,padding:"6px 10px",fontSize:14}} autoFocus/>
+                          <button onClick={()=>confirmEliminate(c.name,elimEpInput)} style={S.smallBtn}>☠ Confirm</button>
+                          <button onClick={()=>setElimPending(null)} style={S.smallBtnGhost}>Cancel</button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={c.name} onClick={()=>{setElimPending(c.name);setElimEpInput(1);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"rgba(255,255,255,0.03)",cursor:"pointer",border:"1px solid rgba(255,255,255,0.05)"}}>
+                        <Portrait slug={c.slug} tribe={curTribe} size={32}/>
+                        <span style={{color:"#E8D5B5",fontWeight:600,flex:1}}>{c.name}</span>
+                        <span style={{fontSize:11,padding:"1px 7px",borderRadius:3,background:tribeColor(curTribe)+"22",color:tribeColor(curTribe),fontWeight:700}}>{curTribe}</span>
+                      </div>
                     );
                   })}
                 </div>
@@ -605,10 +847,8 @@ function App() {
                 <h2 style={S.cardTitle}>Tribe Tracker</h2>
                 <p style={{color:"#A89070",fontSize:13,marginBottom:4}}>Use this after tribe swaps or the merge. Original tribe shown in brackets.</p>
                 <p style={{color:"#A89070",fontSize:12,marginBottom:16,fontStyle:"italic"}}>Changes update tribe colors throughout the entire app.</p>
-
-                {/* Group by current tribe for display */}
                 {ALL_TRIBE_OPTIONS.map(tribeLabel=>{
-                  const membersInTribe = CONTESTANTS.filter(c=>getEffectiveTribe(c.name)===tribeLabel);
+                  const membersInTribe=CONTESTANTS.filter(c=>getEffectiveTribe(c.name)===tribeLabel);
                   if(membersInTribe.length===0) return null;
                   return(
                     <div key={tribeLabel} style={{marginBottom:20}}>
@@ -619,17 +859,15 @@ function App() {
                       </div>
                       <div style={{display:"grid",gap:6}}>
                         {membersInTribe.map(c=>{
-                          const isE=eliminated.includes(c.name);
-                          const originalTribe=c.tribe;
-                          const swapped=tribeOverrides[c.name]&&tribeOverrides[c.name]!==originalTribe;
+                          const isE=isElim(eliminated,c.name);
+                          const swapped=tribeOverrides[c.name]&&tribeOverrides[c.name]!==c.tribe;
                           return(
                             <div key={c.name} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"rgba(255,255,255,0.03)",opacity:isE?0.5:1}}>
                               <Portrait slug={c.slug} tribe={tribeLabel} size={32} eliminated={isE}/>
                               <div style={{flex:1}}>
                                 <span style={{color:"#E8D5B5",fontWeight:600,textDecoration:isE?"line-through":"none"}}>{c.name}</span>
-                                {swapped&&<span style={{color:"#A89070",fontSize:12,marginLeft:6}}>[was {originalTribe}]</span>}
+                                {swapped&&<span style={{color:"#A89070",fontSize:12,marginLeft:6}}>[was {c.tribe}]</span>}
                               </div>
-                              {/* Tribe reassignment buttons */}
                               <div style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
                                 {ALL_TRIBE_OPTIONS.map(t=>(
                                   <button key={t} onClick={()=>setContestantTribe(c.name,t)} style={{padding:"3px 8px",borderRadius:4,fontSize:11,cursor:"pointer",fontFamily:"'Cinzel',serif",fontWeight:600,border:`1px solid ${tribeColor(t)}55`,background:getEffectiveTribe(c.name)===t?tribeColor(t)+"33":"transparent",color:getEffectiveTribe(c.name)===t?tribeColor(t):"#A89070",transition:"all 0.12s"}}>
@@ -656,7 +894,7 @@ function App() {
                 <div style={S.formRow}><label style={S.formLabel}>Contestants ({teamDraft.members.length} selected)</label><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const sel=teamDraft.members.includes(c.name);const curTribe=getEffectiveTribe(c.name);return(<button key={c.name} onClick={()=>setTeamDraft({...teamDraft,members:sel?teamDraft.members.filter(m=>m!==c.name):[...teamDraft.members,c.name]})} style={{...S.contestantChip,background:sel?tribeColor(curTribe):"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?tribeColor(curTribe):"rgba(255,255,255,0.1)"}}>{c.name}</button>);})}</div></div>
                 <button style={S.primaryBtn} onClick={saveTeam}>Save Team</button>
               </div>
-              <div style={S.card}><h2 style={S.cardTitle}>Current Teams</h2>{Object.entries(appState.teams||{}).map(([name,team])=>(<div key={name} style={S.existingTeam}><div style={{flex:1}}><p style={{color:"#E8D5B5",fontWeight:700,marginBottom:4}}>{name}</p><p style={{color:"#A89070",fontSize:13,marginBottom:2}}>Owner: {appState.users[team.owner]?.displayName}</p>{team.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginBottom:6}}>"{team.motto}"</p>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{team.members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const curTribe=getEffectiveTribe(m);return(<span key={m} style={{fontSize:12,padding:"2px 8px",borderRadius:4,background:tribeColor(curTribe)+"33",color:tribeColor(curTribe),textDecoration:eliminated.includes(m)?"line-through":"none"}}>{m}</span>);})}</div></div><div style={{display:"flex",gap:8}}><button style={S.editBtn} onClick={()=>setTeamDraft({teamName:name,members:[...team.members],editOwner:team.owner,editKey:name})}>Edit</button><button style={S.removeBtn} onClick={()=>deleteTeam(name)}>Delete</button></div></div>))}{Object.keys(appState.teams||{}).length===0&&<p style={{color:"#A89070"}}>No teams created yet.</p>}</div>
+              <div style={S.card}><h2 style={S.cardTitle}>Current Teams</h2>{Object.entries(appState.teams||{}).map(([name,team])=>(<div key={name} style={S.existingTeam}><div style={{flex:1}}><p style={{color:"#E8D5B5",fontWeight:700,marginBottom:4}}>{name}</p><p style={{color:"#A89070",fontSize:13,marginBottom:2}}>Owner: {appState.users[team.owner]?.displayName}</p>{team.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginBottom:6}}>"{team.motto}"</p>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{team.members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const curTribe=getEffectiveTribe(m);return(<span key={m} style={{fontSize:12,padding:"2px 8px",borderRadius:4,background:tribeColor(curTribe)+"33",color:tribeColor(curTribe),textDecoration:isElim(eliminated,m)?"line-through":"none"}}>{m}</span>);})}</div></div><div style={{display:"flex",gap:8}}><button style={S.editBtn} onClick={()=>setTeamDraft({teamName:name,members:[...team.members],editOwner:team.owner,editKey:name})}>Edit</button><button style={S.removeBtn} onClick={()=>deleteTeam(name)}>Delete</button></div></div>))}{Object.keys(appState.teams||{}).length===0&&<p style={{color:"#A89070"}}>No teams created yet.</p>}</div>
               <div style={S.card}><h2 style={S.cardTitle}>Commissioner Powers</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Grant or revoke commissioner access.</p>{Object.entries(appState.users).map(([key,u])=>{const isC=(appState.commissioners||[]).includes(key);return(<div key={key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{color:"#E8D5B5"}}>{u.displayName}</span>{isC&&<span style={S.commBadge}>COMMISH</span>}</div>{key!==currentUser&&<button style={isC?S.removeBtn:S.editBtn} onClick={()=>toggleCommissioner(key)}>{isC?"Revoke":"Grant"}</button>}</div>);})}</div>
               <div style={S.card}><h2 style={S.cardTitle}>League Settings</h2><div style={S.formRow}><label style={S.formLabel}>League Name</label><input style={S.input} value={appState.leagueName} onChange={e=>saveState({...appState,leagueName:e.target.value})}/></div></div>
               <div style={{...S.card,borderColor:"rgba(248,113,113,0.3)"}}><h2 style={{...S.cardTitle,color:"#F87171"}}>Danger Zone</h2><button style={{...S.removeBtn,padding:"8px 16px",fontSize:14}} onClick={async()=>{if(confirm("Reset ALL data? This cannot be undone.")){await saveState(DEFAULT_STATE);setCurrentUser(null);setView("login");}}}>Reset Entire League</button></div>
@@ -722,12 +960,7 @@ const S = {
   tribeDot:{width:10,height:10,borderRadius:"50%",flexShrink:0},
   memberName:{color:"#E8D5B5",fontWeight:600,fontSize:15},
   memberTribe:{color:"#A89070",fontSize:13},
-  memberScore:{marginLeft:"auto",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:"#FF8C42"},
-  standingRow:{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",borderRadius:6,marginBottom:4},
-  standingRank:{fontFamily:"'Cinzel',serif",fontWeight:700,color:"#A89070",width:30},
-  standingName:{fontWeight:600,color:"#E8D5B5"},
-  standingOwner:{color:"#A89070",fontSize:13,minWidth:60,textAlign:"right"},
-  standingScore:{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:18,color:"#FF8C42",minWidth:40,textAlign:"right"},
+  memberScore:{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:"#FF8C42"},
   leaderboardCard:{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:16,marginBottom:12,cursor:"pointer"},
   leaderboardHeader:{display:"flex",justifyContent:"space-between",alignItems:"center"},
   rankBadge:{width:32,height:32,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:14,color:"#1A0F05"},
@@ -748,7 +981,6 @@ const S = {
   existingTeam:{display:"flex",alignItems:"center",gap:12,padding:16,background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:8,flexWrap:"wrap"},
   editBtn:{padding:"6px 14px",background:"rgba(255,140,66,0.15)",border:"1px solid rgba(255,140,66,0.3)",borderRadius:6,color:"#FF8C42",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
   removeBtn:{padding:"4px 10px",background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:6,color:"#F87171",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
-  // Commissioner sidebar
   commishSidebar:{display:"flex",flexDirection:"column",gap:4,minWidth:160,position:"sticky",top:80},
   commishSideBtn:{padding:"12px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,color:"#A89070",fontFamily:"'Cinzel',serif",fontSize:13,cursor:"pointer",textAlign:"left",transition:"all 0.15s"},
   commishSideBtnActive:{background:"rgba(255,107,53,0.12)",border:"1px solid rgba(255,107,53,0.3)",color:"#FF8C42"},

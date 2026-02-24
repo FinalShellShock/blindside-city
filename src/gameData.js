@@ -60,4 +60,5 @@ export const DEFAULT_STATE = {
   leagueName: "Fantasy Survivor 50",
   announcement: "",
   eliminated: [],
+  tribeOverrides: {},
 };
