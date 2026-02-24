@@ -72,24 +72,60 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
 
 // ── Reaction Bar ──
 function ReactionBar({ reactions = {}, onReact, currentUser }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const activeEmojis = REACTION_EMOJIS.filter(e => (reactions[e] || []).length > 0);
   return (
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-      {REACTION_EMOJIS.map(emoji => {
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6, alignItems: "center" }}>
+      {/* Only show emojis that have at least one reaction */}
+      {activeEmojis.map(emoji => {
         const users = reactions[emoji] || [];
         const reacted = users.includes(currentUser);
         const count = users.length;
         return (
-          <button key={emoji} onClick={() => onReact(emoji)} style={{
+          <button key={emoji} onClick={() => { onReact(emoji); setPickerOpen(false); }} style={{
             padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
             background: reacted ? "rgba(255,140,66,0.2)" : "rgba(255,255,255,0.04)",
             border: reacted ? "1px solid rgba(255,140,66,0.5)" : "1px solid rgba(255,255,255,0.08)",
             color: reacted ? "#FF8C42" : "#A89070",
             display: "flex", alignItems: "center", gap: 4, transition: "all 0.12s",
           }}>
-            {emoji}{count > 0 && <span style={{ fontSize: 12, fontWeight: 600 }}>{count}</span>}
+            {emoji}<span style={{ fontSize: 12, fontWeight: 600 }}>{count}</span>
           </button>
         );
       })}
+      {/* + button to open emoji picker */}
+      <div style={{ position: "relative" }}>
+        <button onClick={() => setPickerOpen(o => !o)} style={{
+          padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
+          background: pickerOpen ? "rgba(255,140,66,0.12)" : "transparent",
+          border: pickerOpen ? "1px solid rgba(255,140,66,0.3)" : "1px dashed rgba(255,255,255,0.15)",
+          color: "#A89070", display: "flex", alignItems: "center", gap: 2, transition: "all 0.12s",
+          lineHeight: 1,
+        }}>
+          <span style={{ fontSize: 15, fontWeight: 300 }}>+</span>
+        </button>
+        {pickerOpen && (
+          <div style={{
+            position: "absolute", bottom: "calc(100% + 6px)", left: 0,
+            display: "flex", gap: 4, padding: "6px 8px", borderRadius: 12,
+            background: "rgba(42,26,10,0.97)", border: "1px solid rgba(255,140,66,0.2)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.5)", zIndex: 50, whiteSpace: "nowrap",
+          }}>
+            {REACTION_EMOJIS.map(emoji => (
+              <button key={emoji} onClick={() => { onReact(emoji); setPickerOpen(false); }} style={{
+                background: "transparent", border: "none", fontSize: 20, cursor: "pointer",
+                padding: "2px 4px", borderRadius: 6, transition: "transform 0.1s",
+                lineHeight: 1,
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.3)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
