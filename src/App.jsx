@@ -73,16 +73,11 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
 // ── Reaction Bar ──
 function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [tooltip, setTooltip] = useState(null); // { emoji, x, y }
+  const [tooltip, setTooltip] = useState(null); // emoji key whose tooltip is showing
   const activeEmojis = REACTION_EMOJIS.filter(e => (reactions[e] || []).length > 0);
 
   const getNames = (userKeys) =>
     userKeys.map(k => users[k]?.displayName || k).join(", ");
-
-  const showTooltip = (emoji, btn) => {
-    const rect = btn.getBoundingClientRect();
-    setTooltip({ emoji, x: rect.left + rect.width / 2, y: rect.top - 8 });
-  };
 
   return (
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6, alignItems: "center" }}>
@@ -91,14 +86,14 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
         const userKeys = reactions[emoji] || [];
         const reacted = userKeys.includes(currentUser);
         const count = userKeys.length;
-        const showTip = tooltip?.emoji === emoji;
+        const showTip = tooltip === emoji;
         return (
           <div key={emoji} style={{ position: "relative" }}>
             <button
               onClick={() => { onReact(emoji); setPickerOpen(false); setTooltip(null); }}
-              onMouseEnter={e => showTooltip(emoji, e.currentTarget)}
+              onMouseEnter={() => setTooltip(emoji)}
               onMouseLeave={() => setTooltip(null)}
-              onTouchStart={e => { e.preventDefault(); showTip ? setTooltip(null) : showTooltip(emoji, e.currentTarget); }}
+              onTouchStart={() => setTooltip(t => t === emoji ? null : emoji)}
               style={{
                 padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
                 background: reacted ? "rgba(255,140,66,0.2)" : "rgba(255,255,255,0.04)",
@@ -110,16 +105,16 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
             </button>
             {showTip && (
               <div style={{
-                position: "fixed",
-                left: tooltip.x, top: tooltip.y,
-                transform: "translate(-50%, -100%)",
+                position: "absolute", bottom: "calc(100% + 6px)", left: "50%",
+                transform: "translateX(-50%)",
                 background: "rgba(26,15,5,0.97)", border: "1px solid rgba(255,140,66,0.25)",
                 borderRadius: 8, padding: "5px 10px", whiteSpace: "nowrap",
                 fontSize: 12, color: "#E8D5B5", pointerEvents: "none",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.6)", zIndex: 9999,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.6)", zIndex: 100,
                 fontFamily: "'Crimson Pro',serif",
               }}>
                 {getNames(userKeys)}
+                {/* little arrow */}
                 <div style={{
                   position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
                   width: 0, height: 0,
