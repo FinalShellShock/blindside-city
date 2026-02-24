@@ -623,33 +623,36 @@ function App() {
                   </div>
 
                   {/* Scoring events section */}
-                  <div style={{padding:"12px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                    <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,marginBottom:8}}>⚡ SCORING EVENTS</p>
+                  <div style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    {/* Title sits outside the scroll area so it never floats over content */}
+                    <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,padding:"12px 20px 8px"}}>⚡ SCORING EVENTS</p>
                     {epEvents.length > 0 ? (
-                      <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:2,paddingTop:40,marginTop:-40}}>
-                        {epEvents.map((ev, i) => {
-                          const rule = SCORING_RULES[ev.type];
-                          const curTribe = getEffectiveTribe(ev.contestant);
-                          return (
-                            <div key={i}>
-                              <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 2px"}}>
-                                <span style={{fontWeight:700,fontSize:14,color:tribeColor(curTribe),flexShrink:0}}>{ev.contestant}</span>
-                                <span style={{color:"#A89070",fontSize:13,flex:1}}>{rule?.label}</span>
-                                <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,color:rule?.points>=0?"#4ADE80":"#F87171",flexShrink:0}}>
-                                  {rule?.points>0?"+":""}{rule?.points}
-                                </span>
+                      <div style={{maxHeight:180,overflowY:"auto",overflowX:"visible",paddingBottom:8}}>
+                        <div style={{display:"flex",flexDirection:"column",gap:2,padding:"0 20px"}}>
+                          {epEvents.map((ev, i) => {
+                            const rule = SCORING_RULES[ev.type];
+                            const curTribe = getEffectiveTribe(ev.contestant);
+                            return (
+                              <div key={i}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 2px"}}>
+                                  <span style={{fontWeight:700,fontSize:14,color:tribeColor(curTribe),flexShrink:0}}>{ev.contestant}</span>
+                                  <span style={{color:"#A89070",fontSize:13,flex:1}}>{rule?.label}</span>
+                                  <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,color:rule?.points>=0?"#4ADE80":"#F87171",flexShrink:0}}>
+                                    {rule?.points>0?"+":""}{rule?.points}
+                                  </span>
+                                </div>
+                                <ReactionBar
+                                  reactions={(ep.eventReactions||{})[String(i)]||{}}
+                                  onReact={(emoji)=>addReaction(ep.number,`event_${i}`,emoji)}
+                                  currentUser={currentUser}
+                                  users={appState.users}
+                                />
                               </div>
-                              <ReactionBar
-                                reactions={(ep.eventReactions||{})[String(i)]||{}}
-                                onReact={(emoji)=>addReaction(ep.number,`event_${i}`,emoji)}
-                                currentUser={currentUser}
-                                users={appState.users}
-                              />
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    ) : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic"}}>No scoring events yet.</p>}
+                    ) : <p style={{color:"rgba(168,144,112,0.4)",fontSize:14,fontStyle:"italic",padding:"0 20px 12px"}}>No scoring events yet.</p>}
                   </div>
 
                   {/* Elimination section */}
