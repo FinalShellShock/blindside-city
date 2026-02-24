@@ -286,7 +286,7 @@ function App() {
               <div style={{marginTop:16,padding:16,background:"rgba(0,0,0,0.2)",borderRadius:8}}>
                 <p style={{fontFamily:"'Cinzel',serif",fontSize:13,color:"#FF8C42",marginBottom:12,letterSpacing:1}}>CHOOSE A LOGO</p>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:16}}>
-                  {STOCK_LOGOS.map(l=>(<div key={l.id} onClick={()=>saveLogo(myTeam[0],l.url)} style={{cursor:"pointer",borderRadius:8,padding:4,border:`2px solid ${myTeam[1].logo===l.url?"#FF8C42":"transparent"}`,background:"rgba(255,255,255,0.03)`,transition:"border 0.15s"}}><img src={l.url} alt={l.label} style={{width:"100%",aspectRatio:"1",borderRadius:6,display:"block"}}/><p style={{color:"#A89070",fontSize:10,textAlign:"center",marginTop:4}}>{l.label}</p></div>))}
+                  {STOCK_LOGOS.map(l=>(<div key={l.id} onClick={()=>saveLogo(myTeam[0],l.url)} style={{cursor:"pointer",borderRadius:8,padding:4,border:`2px solid ${myTeam[1].logo===l.url?"#FF8C42":"transparent"}`,background:"rgba(255,255,255,0.03)",transition:"border 0.15s"}}><img src={l.url} alt={l.label} style={{width:"100%",aspectRatio:"1",borderRadius:6,display:"block"}}/><p style={{color:"#A89070",fontSize:10,textAlign:"center",marginTop:4}}>{l.label}</p></div>))}
                 </div>
                 <p style={{color:"#A89070",fontSize:12,marginBottom:6}}>Or paste a custom image URL:</p>
                 <div style={{display:"flex",gap:8}}>
