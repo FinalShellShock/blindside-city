@@ -114,7 +114,7 @@ function App() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isCommish, setIsCommish] = useState(false);
   const [error, setError] = useState("");
-  const [eventForm, setEventForm] = useState({ contestant: "", event: "", episode: 1 });
+  const [eventForm, setEventForm] = useState({ contestants: [], event: "", episode: 1 });
   const [teamDraft, setTeamDraft] = useState({ teamName: "", members: [], editOwner: null, editKey: null });
   const [editingTeamName, setEditingTeamName] = useState(null);
   const [newTeamName, setNewTeamName] = useState("");
@@ -196,7 +196,7 @@ function App() {
     }); return ts;
   };
 
-  const addEvent = async () => { if(!eventForm.contestant||!eventForm.event) return; const eps=[...(appState.episodes||[])]; let ep=eps.find(e=>e.number===eventForm.episode); if(!ep){ep={number:eventForm.episode,events:[],recap:""};eps.push(ep);} ep.events.push({contestant:eventForm.contestant,type:eventForm.event}); eps.sort((a,b)=>a.number-b.number); await saveState({...appState,episodes:eps}); setEventForm({...eventForm,contestant:"",event:""}); };
+  const addEvent = async () => { if(!eventForm.contestants.length||!eventForm.event) return; const eps=[...(appState.episodes||[])]; let ep=eps.find(e=>e.number===eventForm.episode); if(!ep){ep={number:eventForm.episode,events:[],recap:""};eps.push(ep);} eventForm.contestants.forEach(c=>ep.events.push({contestant:c,type:eventForm.event})); eps.sort((a,b)=>a.number-b.number); await saveState({...appState,episodes:eps}); setEventForm({...eventForm,contestants:[],event:""}); };
   const removeEvent = async (en,ei) => { const eps=[...(appState.episodes||[])]; const ep=eps.find(e=>e.number===en); if(ep){ep.events.splice(ei,1); await saveState({...appState,episodes:eps});} };
   const saveTeam = async () => { if(!teamDraft.teamName.trim()||teamDraft.members.length===0||!teamDraft.editOwner) return; const teams={...appState.teams}; if(teamDraft.editKey&&teamDraft.editKey!==teamDraft.teamName) delete teams[teamDraft.editKey]; teams[teamDraft.teamName]={owner:teamDraft.editOwner,members:teamDraft.members,motto:teams[teamDraft.editKey]?.motto||teams[teamDraft.teamName]?.motto||""}; await saveState({...appState,teams}); setTeamDraft({teamName:"",members:[],editOwner:null,editKey:null}); };
   const deleteTeam = async (tn) => { const teams={...appState.teams}; delete teams[tn]; await saveState({...appState,teams}); };
@@ -266,7 +266,8 @@ function App() {
         <div style={S.headerRight}><span style={S.userName}>{appState.users[currentUser]?.displayName}</span>{isUserCommissioner&&<span style={S.commBadge}>COMMISH</span>}{devMode&&<span style={{...S.commBadge,background:"rgba(74,222,128,0.2)",color:"#4ADE80"}}>DEV</span>}<button style={S.logoutBtn} onClick={()=>{localStorage.removeItem("bc_user");setCurrentUser(null);setView("login");}}>Logout</button></div>
       </header>
       <nav style={S.nav}>
-        {["dashboard","leaderboard","castStatus","scores","rules"].map(v=>(<button key={v} onClick={()=>setView(v)} style={{...S.navBtn,...(view===v?S.navBtnActive:{})}}>{v==="dashboard"?"Home":v==="leaderboard"?"Leaderboard":v==="castStatus"?"Cast":v==="scores"?"Scores":"Rules"}</button>))}
+        {["dashboard","leaderboard","castStatus","rules"].map(v=>(<button key={v} onClick={()=>setView(v)} style={{...S.navBtn,...(view===v?S.navBtnActive:{})}}>{v==="dashboard"?"Home":v==="leaderboard"?"Scoreboard":v==="castStatus"?"Cast":"Rules"}</button>))}
+        {(isUserCommissioner||devMode)&&<button onClick={()=>setView("scores")} style={{...S.navBtn,...(view==="scores"?S.navBtnActive:{}),color:"#FF6B35"}}>Update Scoring</button>}
         {isUserCommissioner&&<button onClick={()=>setView("admin")} style={{...S.navBtn,...(view==="admin"?S.navBtnActive:{}),color:"#FF6B35"}}>Commissioner</button>}
       </nav>
       <main style={S.main}>
@@ -279,7 +280,12 @@ function App() {
                 {editingTeamName===myTeam[0]?(<div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}><input style={{...S.input,marginBottom:0,flex:1}} value={newTeamName} onChange={e=>setNewTeamName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&renameTeam(myTeam[0])} autoFocus/><button style={S.smallBtn} onClick={()=>renameTeam(myTeam[0])}>Save</button><button style={S.smallBtnGhost} onClick={()=>setEditingTeamName(null)}>Cancel</button></div>):(<h2 style={{...S.cardTitle,cursor:"pointer"}} onClick={()=>{setEditingTeamName(myTeam[0]);setNewTeamName(myTeam[0]);}}><span style={{color:"#FF8C42"}}>🔥</span> {myTeam[0]} <span style={{fontSize:12,color:"#A89070"}}>✏️</span></h2>)}
                 {editingMotto===myTeam[0]?(<div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}><input style={{...S.input,marginBottom:0,flex:1}} placeholder="Enter your team motto..." maxLength={80} value={newMotto} onChange={e=>setNewMotto(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveMotto(myTeam[0])} autoFocus/><button style={S.smallBtn} onClick={()=>saveMotto(myTeam[0])}>Save</button><button style={S.smallBtnGhost} onClick={()=>setEditingMotto(null)}>Cancel</button></div>):(<p style={{color:"#A89070",fontSize:14,fontStyle:"italic",cursor:"pointer",marginBottom:8}} onClick={()=>{setEditingMotto(myTeam[0]);setNewMotto(myTeam[1].motto||"");}}>{myTeam[1].motto||"Click to add a team motto..."}</p>)}
               </div>
-              {myTeam[1].logo&&<img src={myTeam[1].logo} alt="team logo" style={{width:72,height:72,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.3)",cursor:"pointer"}} onClick={()=>setEditingLogo(myTeam[0])}/>}
+              {myTeam[1].logo&&(
+                <div onClick={()=>setEditingLogo(myTeam[0])} style={{position:"relative",width:72,height:72,cursor:"pointer",flexShrink:0}}>
+                  <img src={myTeam[1].logo} alt="team logo" style={{width:72,height:72,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.3)"}}/>
+                  <div style={{position:"absolute",bottom:0,right:0,width:22,height:22,borderRadius:"50%",background:"#FF8C42",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,border:"2px solid #1A0F05"}}>✏️</div>
+                </div>
+              )}
               {!myTeam[1].logo&&<button style={{...S.smallBtnGhost,fontSize:11,padding:"6px 10px"}} onClick={()=>setEditingLogo(myTeam[0])}>+ Logo</button>}
             </div>
             {editingLogo===myTeam[0]&&(
@@ -312,7 +318,7 @@ function App() {
 
         {/* LEADERBOARD */}
         {view==="leaderboard"&&(<div>
-          <div style={S.card}><h2 style={S.cardTitle}>Team Leaderboard</h2>
+          <div style={S.card}><h2 style={S.cardTitle}>Scoreboard</h2>
             {sortedTeams.map(([name,data],i)=>(<div key={name} style={S.leaderboardCard} onClick={()=>setExpandedTeam(expandedTeam===name?null:name)}>
               <div style={S.leaderboardHeader}>
                 <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{...S.rankBadge,background:i===0?"linear-gradient(135deg,#FFD93D,#FF8C42)":i===1?"linear-gradient(135deg,#C0C0C0,#A0A0A0)":i===2?"linear-gradient(135deg,#CD7F32,#A0622E)":"#3D3020"}}>{i+1}</span>{appState.teams[name]?.logo&&<img src={appState.teams[name].logo} alt="logo" style={{width:44,height:44,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.3)"}}/>}<div><p style={S.lbTeamName}>{name}</p><p style={S.lbOwner}>{appState.users[data.owner]?.displayName}</p>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div></div>
@@ -321,10 +327,6 @@ function App() {
               {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=eliminated.includes(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:TRIBE_COLORS[c?.tribe]||"#666"}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
             </div>))}
             {sortedTeams.length===0&&<p style={{color:"#A89070"}}>No teams yet.</p>}
-          </div>
-          <div style={S.card}><h2 style={S.cardTitle}>Individual Leaderboard</h2>
-            {CONTESTANTS.filter(c=>contestantScores[c.name]?.total!==0).sort((a,b)=>(contestantScores[b.name]?.total||0)-(contestantScores[a.name]?.total||0)).map((c,i)=>(<div key={c.name} style={S.eventRow}><span style={{color:"#A89070",width:30,fontWeight:600}}>#{i+1}</span><div style={{...S.tribeDot,background:TRIBE_COLORS[c.tribe]}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:eliminated.includes(c.name)?"line-through":"none",opacity:eliminated.includes(c.name)?0.5:1}}>{c.name} {eliminated.includes(c.name)&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:700}}>{contestantScores[c.name]?.total}</span></div>))}
-            {CONTESTANTS.every(c=>contestantScores[c.name]?.total===0)&&<p style={{color:"#A89070"}}>No scores yet.</p>}
           </div>
         </div>)}
 
@@ -385,17 +387,42 @@ function App() {
         </div>)}
 
         {/* SCORES */}
-        {view==="scores"&&(<div>
-          {isUserCommissioner||devMode?(<>
-            <div style={S.card}><h2 style={S.cardTitle}>Enter Episode Events</h2>
-              <div style={S.formRow}><label style={S.formLabel}>Episode #</label><input type="number" min="1" max="20" value={eventForm.episode} onChange={e=>setEventForm({...eventForm,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/></div>
-              <div style={S.formRow}><label style={S.formLabel}>Contestant</label><select value={eventForm.contestant} onChange={e=>setEventForm({...eventForm,contestant:e.target.value})} style={S.select}><option value="">Select contestant...</option>{CONTESTANTS.filter(c=>!eliminated.includes(c.name)).map(c=>(<option key={c.name} value={c.name}>{c.name} ({c.tribe})</option>))}{eliminated.length>0&&<optgroup label="── Eliminated ──">{CONTESTANTS.filter(c=>eliminated.includes(c.name)).map(c=>(<option key={c.name} value={c.name}>☠ {c.name}</option>))}</optgroup>}</select></div>
-              <div style={S.formRow}><label style={S.formLabel}>Event</label><select value={eventForm.event} onChange={e=>setEventForm({...eventForm,event:e.target.value})} style={S.select}><option value="">Select event...</option>{Object.entries(SCORING_RULES).map(([k,r])=>(<option key={k} value={k}>{r.label} ({r.points>0?"+":""}{r.points})</option>))}</select></div>
-              <button style={S.primaryBtn} onClick={addEvent}>Add Event</button>
+        {view==="scores"&&(isUserCommissioner||devMode)&&(<div>
+            <div style={S.card}>
+              <h2 style={S.cardTitle}>Update Scoring</h2>
+              <div style={S.formRow}>
+                <label style={S.formLabel}>Episode #</label>
+                <input type="number" min="1" max="20" value={eventForm.episode} onChange={e=>setEventForm({...eventForm,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/>
+              </div>
+              <div style={S.formRow}>
+                <label style={S.formLabel}>Scoring Event</label>
+                <select value={eventForm.event} onChange={e=>setEventForm({...eventForm,event:e.target.value})} style={S.select}>
+                  <option value="">Select event...</option>
+                  {Object.entries(SCORING_RULES).map(([k,r])=>(<option key={k} value={k}>{r.label} ({r.points>0?"+":""}{r.points})</option>))}
+                </select>
+              </div>
+              <div style={S.formRow}>
+                <label style={S.formLabel}>Contestants ({eventForm.contestants.length} selected — tap to select/deselect)</label>
+                <div style={S.contestantPicker}>
+                  {CONTESTANTS.filter(c=>!eliminated.includes(c.name)).map(c=>{
+                    const sel=eventForm.contestants.includes(c.name);
+                    return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)",fontWeight:sel?700:400}}>{c.name}</button>);
+                  })}
+                  {eliminated.length>0&&(<>
+                    <div style={{width:"100%",borderTop:"1px solid rgba(255,255,255,0.06)",margin:"6px 0"}}/>
+                    {CONTESTANTS.filter(c=>eliminated.includes(c.name)).map(c=>{
+                      const sel=eventForm.contestants.includes(c.name);
+                      return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?"rgba(248,113,113,0.3)":"rgba(255,255,255,0.03)",color:sel?"#F87171":"#555",borderColor:sel?"rgba(248,113,113,0.5)":"rgba(255,255,255,0.06)",textDecoration:"line-through"}}>☠ {c.name}</button>);
+                    })}
+                  </>)}
+                </div>
+              </div>
+              <button style={{...S.primaryBtn,opacity:!eventForm.contestants.length||!eventForm.event?0.4:1}} onClick={addEvent}>
+                Add {eventForm.contestants.length>1?`${eventForm.contestants.length} Events`:"Event"}
+              </button>
             </div>
             <div style={S.card}><h2 style={S.cardTitle}>Episode Recap</h2><div style={S.formRow}><label style={S.formLabel}>Episode #</label><input type="number" min="1" max="20" value={episodeRecap.episode} onChange={e=>setEpisodeRecap({...episodeRecap,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/></div><textarea style={{...S.input,minHeight:80,resize:"vertical"}} placeholder="What happened this episode..." value={episodeRecap.text} onChange={e=>setEpisodeRecap({...episodeRecap,text:e.target.value})}/><button style={S.primaryBtn} onClick={saveRecap}>Save Recap</button></div>
             <div style={S.card}><h2 style={S.cardTitle}>Event Log</h2>{[...appState.episodes].sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:20}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={{...S.eventRow,alignItems:"center"}}><span style={S.eventContestant}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span><button onClick={()=>removeEvent(ep.number,i)} style={S.removeBtn}>✕</button></div>))}</div>))}{appState.episodes.length===0&&<p style={{color:"#A89070"}}>No events recorded yet.</p>}</div>
-          </>):(<div style={S.card}><h2 style={S.cardTitle}>Scores</h2><p style={{color:"#A89070",marginBottom:16}}>Only commissioners can enter scores.</p>{appState.episodes.length>0&&[...appState.episodes].sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:20}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.recap&&<p style={{color:"#A89070",fontSize:14,fontStyle:"italic",marginBottom:8}}>{ep.recap}</p>}{ep.events.map((ev,i)=>(<div key={i} style={S.eventRow}><span style={S.eventContestant}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span></div>))}</div>))}</div>)}
         </div>)}
 
         {/* RULES */}
