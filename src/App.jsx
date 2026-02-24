@@ -71,25 +71,54 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
 }
 
 // ── Reaction Bar ──
-// Tooltip anchors to left:0 of the outer wrapper and grows rightward — never clips left.
-// The outer wrapper is position:relative so the absolute tooltip stays inside the card.
-// Desktop: hover = show tooltip, click = react. No layout shift so no flicker.
-// Mobile:  short tap = react, hold 400ms = show tooltip (above pills, clear of thumb).
 function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [activeEmoji, setActiveEmoji] = useState(null);
+  const [arrowOffset, setArrowOffset] = useState(12); // px from left of tooltip to arrow
   const holdTimer = useRef(null);
+  const dismissTimer = useRef(null);
   const didHold = useRef(false);
+  const wrapperRef = useRef(null);
   const activeEmojis = REACTION_EMOJIS.filter(e => (reactions[e] || []).length > 0);
 
   const getNames = (userKeys) =>
     userKeys.map(k => users[k]?.displayName || k).join(", ");
 
-  const startHold = (emoji) => {
+  // Dismiss tooltip after 3s on mobile, or on any outside touch
+  const scheduleDismiss = () => {
+    clearTimeout(dismissTimer.current);
+    dismissTimer.current = setTimeout(() => setActiveEmoji(null), 3000);
+  };
+
+  // Global touch-outside handler to dismiss tooltip on mobile
+  useEffect(() => {
+    if (!activeEmoji) return;
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setActiveEmoji(null);
+      }
+    };
+    document.addEventListener("touchstart", handler);
+    return () => document.removeEventListener("touchstart", handler);
+  }, [activeEmoji]);
+
+  const showTooltip = (emoji, btnEl) => {
+    setActiveEmoji(emoji);
+    // Compute arrow offset: center of button relative to wrapper left
+    if (btnEl && wrapperRef.current) {
+      const btnRect = btnEl.getBoundingClientRect();
+      const wrapRect = wrapperRef.current.getBoundingClientRect();
+      const center = btnRect.left + btnRect.width / 2 - wrapRect.left;
+      setArrowOffset(Math.max(8, Math.round(center) - 5));
+    }
+  };
+
+  const startHold = (emoji, btnEl) => {
     didHold.current = false;
     holdTimer.current = setTimeout(() => {
       didHold.current = true;
-      setActiveEmoji(prev => prev === emoji ? null : emoji);
+      showTooltip(emoji, btnEl);
+      scheduleDismiss();
     }, 400);
   };
 
@@ -104,9 +133,10 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
   };
 
   return (
-    <div style={{ marginTop: 6, position: "relative" }}>
+    <div ref={wrapperRef} style={{ marginTop: 6, position: "relative" }}>
 
-      {/* Tooltip: left-anchored, grows right, stays inside the card */}
+      {/* Tooltip: left-anchored so it never clips outside the card.
+          Arrow offset computed per-pill so it points at the right emoji. */}
       {activeEmoji && (reactions[activeEmoji] || []).length > 0 && (
         <div style={{
           position: "absolute", bottom: "calc(100% + 5px)", left: 0,
@@ -118,7 +148,7 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
         }}>
           {activeEmoji} {getNames(reactions[activeEmoji])}
           <div style={{
-            position: "absolute", top: "100%", left: 12,
+            position: "absolute", top: "100%", left: arrowOffset,
             width: 0, height: 0,
             borderLeft: "5px solid transparent", borderRight: "5px solid transparent",
             borderTop: "5px solid rgba(255,140,66,0.25)",
@@ -135,9 +165,9 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
             <button
               key={emoji}
               onClick={() => { onReact(emoji); setPickerOpen(false); setActiveEmoji(null); }}
-              onMouseEnter={() => setActiveEmoji(emoji)}
+              onMouseEnter={e => showTooltip(emoji, e.currentTarget)}
               onMouseLeave={() => setActiveEmoji(null)}
-              onTouchStart={() => startHold(emoji)}
+              onTouchStart={e => startHold(emoji, e.currentTarget)}
               onTouchEnd={e => endHold(emoji, e)}
               onTouchCancel={() => clearTimeout(holdTimer.current)}
               style={{
@@ -168,7 +198,7 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
               position: "absolute", bottom: "calc(100% + 6px)", left: 0,
               display: "flex", gap: 4, padding: "6px 8px", borderRadius: 12,
               background: "rgba(42,26,10,0.97)", border: "1px solid rgba(255,140,66,0.2)",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.5)", zIndex: 50, whiteSpace: "nowrap",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.5)", zIndex: 200, whiteSpace: "nowrap",
             }}>
               {REACTION_EMOJIS.map(emoji => (
                 <button key={emoji} onClick={() => { onReact(emoji); setPickerOpen(false); }} style={{
@@ -586,7 +616,7 @@ function App() {
                   <div style={{padding:"12px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                     <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#A89070",letterSpacing:2,marginBottom:8}}>⚡ SCORING EVENTS</p>
                     {epEvents.length > 0 ? (
-                      <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>
+                      <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:2,paddingTop:40,marginTop:-40}}>
                         {epEvents.map((ev, i) => {
                           const rule = SCORING_RULES[ev.type];
                           const curTribe = getEffectiveTribe(ev.contestant);
