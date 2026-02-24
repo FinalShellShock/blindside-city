@@ -548,7 +548,6 @@ function App() {
 
   return (
     <div style={S.appContainer}><style>{globalStyles}</style><FireParticles/>
-      {appState.announcement&&<div style={S.announcementBanner}><span style={{marginRight:8}}>📣</span>{appState.announcement}</div>}
       <header style={S.header}>
         <div style={S.headerLeft}><TorchIcon size={28}/><div><h1 style={S.headerTitle}>{appState.leagueName}</h1><p style={S.headerSub}>Season 50</p></div></div>
         <div style={S.headerRight}><span style={S.userName}>{appState.users[currentUser]?.displayName}</span>{isUserCommissioner&&<span style={S.commBadge}>COMMISH</span>}{devMode&&<span style={{...S.commBadge,background:"rgba(74,222,128,0.2)",color:"#4ADE80"}}>DEV</span>}<button style={S.logoutBtn} onClick={()=>{localStorage.removeItem("bc_user");setCurrentUser(null);setView("login");}}>Logout</button></div>
