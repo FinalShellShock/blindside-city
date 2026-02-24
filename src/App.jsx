@@ -73,27 +73,28 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
 // ── Reaction Bar ──
 function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [tooltip, setTooltip] = useState(null); // emoji key whose tooltip is showing
+  const [activeEmoji, setActiveEmoji] = useState(null); // emoji whose names are shown
   const activeEmojis = REACTION_EMOJIS.filter(e => (reactions[e] || []).length > 0);
 
   const getNames = (userKeys) =>
     userKeys.map(k => users[k]?.displayName || k).join(", ");
 
   return (
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6, alignItems: "center" }}>
-      {/* Only show emojis that have at least one reaction */}
-      {activeEmojis.map(emoji => {
-        const userKeys = reactions[emoji] || [];
-        const reacted = userKeys.includes(currentUser);
-        const count = userKeys.length;
-        const showTip = tooltip === emoji;
-        return (
-          <div key={emoji} style={{ position: "relative" }}>
+    <div style={{ marginTop: 6 }}>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+        {/* Only show emojis that have at least one reaction */}
+        {activeEmojis.map(emoji => {
+          const userKeys = reactions[emoji] || [];
+          const reacted = userKeys.includes(currentUser);
+          const count = userKeys.length;
+          const isActive = activeEmoji === emoji;
+          return (
             <button
-              onClick={() => { onReact(emoji); setPickerOpen(false); setTooltip(null); }}
-              onMouseEnter={() => setTooltip(emoji)}
-              onMouseLeave={() => setTooltip(null)}
-              onTouchStart={() => setTooltip(t => t === emoji ? null : emoji)}
+              key={emoji}
+              onClick={() => { onReact(emoji); setPickerOpen(false); setActiveEmoji(null); }}
+              onMouseEnter={() => setActiveEmoji(emoji)}
+              onMouseLeave={() => setActiveEmoji(null)}
+              onTouchStart={e => { e.preventDefault(); setActiveEmoji(isActive ? null : emoji); }}
               style={{
                 padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
                 background: reacted ? "rgba(255,140,66,0.2)" : "rgba(255,255,255,0.04)",
@@ -103,62 +104,51 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
               }}>
               {emoji}<span style={{ fontSize: 12, fontWeight: 600 }}>{count}</span>
             </button>
-            {showTip && (
-              <div style={{
-                position: "absolute", bottom: "calc(100% + 6px)", left: "50%",
-                transform: "translateX(-50%)",
-                background: "rgba(26,15,5,0.97)", border: "1px solid rgba(255,140,66,0.25)",
-                borderRadius: 8, padding: "5px 10px", whiteSpace: "nowrap",
-                fontSize: 12, color: "#E8D5B5", pointerEvents: "none",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.6)", zIndex: 100,
-                fontFamily: "'Crimson Pro',serif",
-              }}>
-                {getNames(userKeys)}
-                {/* little arrow */}
-                <div style={{
-                  position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
-                  width: 0, height: 0,
-                  borderLeft: "5px solid transparent", borderRight: "5px solid transparent",
-                  borderTop: "5px solid rgba(255,140,66,0.25)",
-                }}/>
-              </div>
-            )}
-          </div>
-        );
-      })}
-      {/* + button to open emoji picker */}
-      <div style={{ position: "relative" }}>
-        <button onClick={() => { setPickerOpen(o => !o); setTooltip(null); }} style={{
-          padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
-          background: pickerOpen ? "rgba(255,140,66,0.12)" : "transparent",
-          border: pickerOpen ? "1px solid rgba(255,140,66,0.3)" : "1px dashed rgba(255,255,255,0.15)",
-          color: "#A89070", display: "flex", alignItems: "center", gap: 2, transition: "all 0.12s",
-          lineHeight: 1,
-        }}>
-          <span style={{ fontSize: 15, fontWeight: 300 }}>+</span>
-        </button>
-        {pickerOpen && (
-          <div style={{
-            position: "absolute", bottom: "calc(100% + 6px)", left: 0,
-            display: "flex", gap: 4, padding: "6px 8px", borderRadius: 12,
-            background: "rgba(42,26,10,0.97)", border: "1px solid rgba(255,140,66,0.2)",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.5)", zIndex: 50, whiteSpace: "nowrap",
+          );
+        })}
+        {/* + button to open emoji picker */}
+        <div style={{ position: "relative" }}>
+          <button onClick={() => { setPickerOpen(o => !o); setActiveEmoji(null); }} style={{
+            padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
+            background: pickerOpen ? "rgba(255,140,66,0.12)" : "transparent",
+            border: pickerOpen ? "1px solid rgba(255,140,66,0.3)" : "1px dashed rgba(255,255,255,0.15)",
+            color: "#A89070", display: "flex", alignItems: "center", gap: 2, transition: "all 0.12s",
+            lineHeight: 1,
           }}>
-            {REACTION_EMOJIS.map(emoji => (
-              <button key={emoji} onClick={() => { onReact(emoji); setPickerOpen(false); }} style={{
-                background: "transparent", border: "none", fontSize: 20, cursor: "pointer",
-                padding: "2px 4px", borderRadius: 6, transition: "transform 0.1s",
-                lineHeight: 1,
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.3)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
+            <span style={{ fontSize: 15, fontWeight: 300 }}>+</span>
+          </button>
+          {pickerOpen && (
+            <div style={{
+              position: "absolute", bottom: "calc(100% + 6px)", left: 0,
+              display: "flex", gap: 4, padding: "6px 8px", borderRadius: 12,
+              background: "rgba(42,26,10,0.97)", border: "1px solid rgba(255,140,66,0.2)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.5)", zIndex: 50, whiteSpace: "nowrap",
+            }}>
+              {REACTION_EMOJIS.map(emoji => (
+                <button key={emoji} onClick={() => { onReact(emoji); setPickerOpen(false); }} style={{
+                  background: "transparent", border: "none", fontSize: 20, cursor: "pointer",
+                  padding: "2px 4px", borderRadius: 6, transition: "transform 0.1s",
+                  lineHeight: 1,
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = "scale(1.3)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+      {/* Names shown inline below the pills — no floating, no clipping */}
+      {activeEmoji && reactions[activeEmoji]?.length > 0 && (
+        <div style={{
+          fontSize: 11, color: "#A89070", marginTop: 3, paddingLeft: 2,
+          fontFamily: "'Crimson Pro',serif", fontStyle: "italic",
+        }}>
+          {activeEmoji} {getNames(reactions[activeEmoji])}
+        </div>
+      )}
     </div>
   );
 }
