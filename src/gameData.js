@@ -1,0 +1,58 @@
+export const SCORING_RULES = {
+  survives_premerge: { label: "Survives Pre-Merge", points: 3 },
+  survives_postmerge: { label: "Survives Post-Merge", points: 6 },
+  reward_participation: { label: "Reward Participation", points: 2 },
+  reward_winner: { label: "Reward Winner", points: 4 },
+  first_place_team: { label: "First Place Team", points: 1 },
+  team_immunity: { label: "Team Immunity", points: 2 },
+  first_place_3_tribe: { label: "First Place (3 Tribe)", points: 1 },
+  individual_reward: { label: "Individual Reward", points: 4 },
+  individual_immunity: { label: "Individual Immunity", points: 6 },
+  finds_advantage: { label: "Finds Advantage", points: 3 },
+  plays_advantage: { label: "Plays Advantage", points: 6 },
+  voted_off_with_idol: { label: "Voted Off with Idol", points: -6 },
+  makes_fake_idol: { label: "Makes Fake Idol", points: 2 },
+  misuse_of_idol: { label: "Misuse of Idol", points: -2 },
+  fake_idol_used_by_another: { label: "Fake Idol Used by Another", points: 4 },
+  quits: { label: "Quits", points: -8 },
+  sole_survivor: { label: "Sole Survivor", points: 30 },
+};
+
+export const CONTESTANTS = [
+  { name: "Rick Devens", tribe: "Cila", season: "38" },
+  { name: "Cirie Fields", tribe: "Cila", season: "12,16,20,34" },
+  { name: "Emily Flippen", tribe: "Cila", season: "45" },
+  { name: "Christian Hubicki", tribe: "Cila", season: "37" },
+  { name: "Joe Hunter", tribe: "Cila", season: "48" },
+  { name: "Jenna Lewis", tribe: "Cila", season: "1,8" },
+  { name: "Savannah Louie", tribe: "Cila", season: "49" },
+  { name: "Ozzy Lusth", tribe: "Cila", season: "13,16,23,34" },
+  { name: "Charlie Davis", tribe: "Kalo", season: "46" },
+  { name: "Tiffany Ervin", tribe: "Kalo", season: "46" },
+  { name: "Chrissy Hofbeck", tribe: "Kalo", season: "35" },
+  { name: "Kamilla Karthigesu", tribe: "Kalo", season: "48" },
+  { name: "Dee Valladares", tribe: "Kalo", season: "45" },
+  { name: 'Benjamin "Coach" Wade', tribe: "Kalo", season: "18,20,23" },
+  { name: "Mike White", tribe: "Kalo", season: "37" },
+  { name: "Jonathan Young", tribe: "Kalo", season: "42" },
+  { name: "Aubry Bracco", tribe: "Vatu", season: "32,34,38" },
+  { name: "Q Burdette", tribe: "Vatu", season: "46" },
+  { name: "Colby Donaldson", tribe: "Vatu", season: "2,8,20" },
+  { name: "Kyle Fraser", tribe: "Vatu", season: "48" },
+  { name: "Angelina Keeley", tribe: "Vatu", season: "37" },
+  { name: "Stephenie LaGrossa", tribe: "Vatu", season: "10,11,20" },
+  { name: "Genevieve Mushaluk", tribe: "Vatu", season: "47" },
+  { name: "Rizo Velovic", tribe: "Vatu", season: "49" },
+];
+
+export const TRIBE_COLORS = { Cila: "#E85D26", Kalo: "#2BA8A0", Vatu: "#C4267A" };
+
+export const DEFAULT_STATE = {
+  users: {},
+  teams: {},
+  episodes: [],
+  commissioners: [],
+  leagueName: "Fantasy Survivor 50",
+  announcement: "",
+  eliminated: [],
+};

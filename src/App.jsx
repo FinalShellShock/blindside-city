@@ -1,0 +1,373 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
+import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE } from "./gameData.js";
+
+// ── Dev mode: access via ?dev=torchsnuffer ──
+const DEV_PASSWORD = "torchsnuffer";
+function useDevMode() {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("dev") === DEV_PASSWORD) setActive(true);
+  }, []);
+  return active;
+}
+
+// ── Small components ──
+function FireParticles() {
+  const p = Array.from({ length: 18 }, (_, i) => ({ id: i, left: Math.random()*100, delay: Math.random()*3, dur: 2+Math.random()*2, size: 2+Math.random()*4 }));
+  return (<div style={{ position:"fixed",top:0,left:0,right:0,bottom:0,pointerEvents:"none",zIndex:0,overflow:"hidden" }}>{p.map(x=>(<div key={x.id} style={{ position:"absolute",bottom:"-10px",left:`${x.left}%`,width:`${x.size}px`,height:`${x.size}px`,borderRadius:"50%",background:"radial-gradient(circle,#FF6B35,#FF8C42,transparent)",animation:`fireFloat ${x.dur}s ease-in ${x.delay}s infinite`,opacity:0 }} />))}</div>);
+}
+function TorchIcon({size=24}){return(<svg width={size} height={size} viewBox="0 0 24 32" fill="none"><rect x="10" y="12" width="4" height="18" rx="1" fill="#8B6914"/><rect x="9" y="10" width="6" height="4" rx="1" fill="#A0782C"/><ellipse cx="12" cy="7" rx="5" ry="6" fill="url(#fl1)" opacity="0.9"/><ellipse cx="12" cy="6" rx="3" ry="4" fill="url(#fl2)"/><ellipse cx="12" cy="5" rx="1.5" ry="2.5" fill="#FFED8A"/><defs><radialGradient id="fl1" cx="0.5" cy="0.7" r="0.6"><stop offset="0%" stopColor="#FFD93D"/><stop offset="60%" stopColor="#FF6B35"/><stop offset="100%" stopColor="#C4261A" stopOpacity="0"/></radialGradient><radialGradient id="fl2" cx="0.5" cy="0.6" r="0.5"><stop offset="0%" stopColor="#FFF7AE"/><stop offset="100%" stopColor="#FF8C42"/></radialGradient></defs></svg>);}
+function SkullIcon({size=14}){return(<svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{display:"inline",verticalAlign:"middle"}}><circle cx="8" cy="7" r="6" fill="#3D3020" stroke="#F87171" strokeWidth="1"/><circle cx="6" cy="6" r="1.2" fill="#F87171"/><circle cx="10" cy="6" r="1.2" fill="#F87171"/><rect x="7" y="9" width="2" height="2" rx="0.5" fill="#F87171"/></svg>);}
+function MiniChart({data,width=200,height=60}){if(!data||data.length<2)return null;const max=Math.max(...data,1),min=Math.min(...data,0),range=max-min||1;const pts=data.map((v,i)=>{const x=(i/(data.length-1))*width,y=height-((v-min)/range)*(height-8)-4;return`${x},${y}`;}).join(" ");return(<svg width={width} height={height} style={{display:"block"}}><polyline points={pts} fill="none" stroke="#FF8C42" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>{data.map((v,i)=>{const x=(i/(data.length-1))*width,y=height-((v-min)/range)*(height-8)-4;return <circle key={i} cx={x} cy={y} r="3" fill="#FFD93D"/>;})}</svg>);}
+
+// ── Dev Panel ──
+function DevPanel({ appState, saveState, setCurrentUser, currentUser }) {
+  const [showRaw, setShowRaw] = useState(false);
+  return (
+    <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+      <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 16, color: "#4ADE80", marginBottom: 12, letterSpacing: 1 }}>🛠 DEV MODE</h2>
+
+      <div style={{ marginBottom: 12 }}>
+        <p style={{ color: "#4ADE80", fontSize: 13, marginBottom: 6, fontWeight: 600 }}>Impersonate User</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {Object.entries(appState.users || {}).map(([key, u]) => (
+            <button key={key} onClick={() => setCurrentUser(key)} style={{ padding: "4px 10px", borderRadius: 6, border: currentUser === key ? "1px solid #4ADE80" : "1px solid rgba(255,255,255,0.1)", background: currentUser === key ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.03)", color: currentUser === key ? "#4ADE80" : "#A89070", fontSize: 12, cursor: "pointer", fontFamily: "'Crimson Pro',serif" }}>
+              {u.displayName}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <button onClick={() => { if (confirm("Seed test data?")) {
+          const testState = { ...appState,
+            users: { ...appState.users, testuser1: { displayName: "TestPlayer1", password: "test" }, testuser2: { displayName: "TestPlayer2", password: "test" } },
+          };
+          saveState(testState);
+        }}} style={devBtn}>Seed Test Users</button>
+        <button onClick={() => setShowRaw(!showRaw)} style={devBtn}>{showRaw ? "Hide" : "Show"} Raw State</button>
+        <button onClick={() => { if (confirm("NUKE EVERYTHING?")) saveState(DEFAULT_STATE); }} style={{ ...devBtn, color: "#F87171", borderColor: "rgba(248,113,113,0.4)" }}>Full Reset</button>
+      </div>
+
+      {showRaw && (
+        <pre style={{ background: "rgba(0,0,0,0.3)", padding: 12, borderRadius: 8, fontSize: 11, color: "#A89070", overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+          {JSON.stringify(appState, null, 2)}
+        </pre>
+      )}
+
+      <p style={{ color: "rgba(74,222,128,0.5)", fontSize: 11, marginTop: 8 }}>
+        Registered: {Object.keys(appState.users||{}).length} users · {Object.keys(appState.teams||{}).length} teams · {(appState.episodes||[]).reduce((a,e) => a + (e.events||[]).length, 0)} events
+      </p>
+    </div>
+  );
+}
+const devBtn = { padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.08)", color: "#4ADE80", fontSize: 12, cursor: "pointer", fontFamily: "'Crimson Pro',serif" };
+
+// ══════════════════════════════════
+// MAIN APP
+// ══════════════════════════════════
+function App() {
+  const devMode = useDevMode();
+  const [appState, setAppState] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [view, setView] = useState("login");
+  const [loading, setLoading] = useState(true);
+  const [loginName, setLoginName] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isCommish, setIsCommish] = useState(false);
+  const [error, setError] = useState("");
+  const [eventForm, setEventForm] = useState({ contestant: "", event: "", episode: 1 });
+  const [teamDraft, setTeamDraft] = useState({ teamName: "", members: [], editOwner: null, editKey: null });
+  const [editingTeamName, setEditingTeamName] = useState(null);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [editingMotto, setEditingMotto] = useState(null);
+  const [newMotto, setNewMotto] = useState("");
+  const [episodeRecap, setEpisodeRecap] = useState({ episode: 1, text: "" });
+  const [announcementDraft, setAnnouncementDraft] = useState("");
+  const [expandedTeam, setExpandedTeam] = useState(null);
+
+  // Load initial state, then subscribe to real-time updates
+  useEffect(() => {
+    let unsubscribe;
+    async function init() {
+      try {
+        const initial = await loadState();
+        setAppState(initial || DEFAULT_STATE);
+        // Real-time sync: when Vito enters scores, everyone sees it live
+        unsubscribe = subscribeToState((newState) => {
+          setAppState(newState);
+        });
+      } catch (err) {
+        console.error("Firebase load error:", err);
+        setAppState(DEFAULT_STATE);
+      }
+      setLoading(false);
+    }
+    init();
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
+
+  const saveState = useCallback(async (ns) => {
+    setAppState(ns);
+    try { await saveStateToDB(ns); }
+    catch (e) { console.error("Save failed:", e); }
+  }, []);
+
+  const handleLogin = async () => {
+    setError("");
+    if (!loginName.trim() || !loginPass.trim()) { setError("Enter a name and password"); return; }
+    const name = loginName.trim().toLowerCase();
+    if (isRegistering) {
+      if (appState.users[name]) { setError("Name already taken"); return; }
+      const isFirst = Object.keys(appState.users).length === 0;
+      const willBeCommish = isCommish && (appState.commissioners||[]).length === 0;
+      await saveState({ ...appState, users: { ...appState.users, [name]: { displayName: loginName.trim(), password: loginPass } }, commissioners: willBeCommish || isFirst ? [...(appState.commissioners||[]), name] : (appState.commissioners||[]) });
+      setCurrentUser(name); setView("dashboard");
+    } else {
+      const user = appState.users[name];
+      if (!user || user.password !== loginPass) { setError("Invalid name or password"); return; }
+      setCurrentUser(name); setView("dashboard");
+    }
+  };
+
+  const isUserCommissioner = currentUser && (appState?.commissioners||[]).includes(currentUser);
+  const getUserTeam = (u) => Object.entries(appState?.teams||{}).find(([_,t])=>t.owner===u);
+
+  const getContestantScores = () => {
+    const s = {}; CONTESTANTS.forEach(c => { s[c.name] = { total:0, events:[], byEpisode:{} }; });
+    (appState?.episodes||[]).forEach(ep => { (ep.events||[]).forEach(ev => { const r = SCORING_RULES[ev.type]; if(r&&s[ev.contestant]){ s[ev.contestant].total+=r.points; s[ev.contestant].events.push({episode:ep.number,type:ev.type,label:r.label,points:r.points}); s[ev.contestant].byEpisode[ep.number]=(s[ev.contestant].byEpisode[ep.number]||0)+r.points; }}); });
+    return s;
+  };
+  const getTeamScores = () => {
+    const cs = getContestantScores(), ts = {};
+    Object.entries(appState?.teams||{}).forEach(([tn,team]) => {
+      let total=0; const ms = {};
+      (team.members||[]).forEach(m => { const sc=cs[m]?.total||0; ms[m]=sc; total+=sc; });
+      const epNums = [...new Set((appState?.episodes||[]).map(e=>e.number))].sort((a,b)=>a-b);
+      let cum=0; const prog = epNums.map(ep => { let et=0; (team.members||[]).forEach(m=>{et+=cs[m]?.byEpisode[ep]||0;}); cum+=et; return cum; });
+      ts[tn] = { total, memberScores:ms, owner:team.owner, progression:prog };
+    }); return ts;
+  };
+
+  const addEvent = async () => { if(!eventForm.contestant||!eventForm.event) return; const eps=[...(appState.episodes||[])]; let ep=eps.find(e=>e.number===eventForm.episode); if(!ep){ep={number:eventForm.episode,events:[],recap:""};eps.push(ep);} ep.events.push({contestant:eventForm.contestant,type:eventForm.event}); eps.sort((a,b)=>a.number-b.number); await saveState({...appState,episodes:eps}); setEventForm({...eventForm,contestant:"",event:""}); };
+  const removeEvent = async (en,ei) => { const eps=[...(appState.episodes||[])]; const ep=eps.find(e=>e.number===en); if(ep){ep.events.splice(ei,1); await saveState({...appState,episodes:eps});} };
+  const saveTeam = async () => { if(!teamDraft.teamName.trim()||teamDraft.members.length===0||!teamDraft.editOwner) return; const teams={...appState.teams}; if(teamDraft.editKey&&teamDraft.editKey!==teamDraft.teamName) delete teams[teamDraft.editKey]; teams[teamDraft.teamName]={owner:teamDraft.editOwner,members:teamDraft.members,motto:teams[teamDraft.editKey]?.motto||teams[teamDraft.teamName]?.motto||""}; await saveState({...appState,teams}); setTeamDraft({teamName:"",members:[],editOwner:null,editKey:null}); };
+  const deleteTeam = async (tn) => { const teams={...appState.teams}; delete teams[tn]; await saveState({...appState,teams}); };
+  const toggleEliminated = async (name) => { const e=[...(appState.eliminated||[])]; const i=e.indexOf(name); if(i>=0)e.splice(i,1);else e.push(name); await saveState({...appState,eliminated:e}); };
+  const toggleCommissioner = async (u) => { const c=[...(appState.commissioners||[])]; const i=c.indexOf(u); if(i>=0)c.splice(i,1);else c.push(u); await saveState({...appState,commissioners:c}); };
+  const saveRecap = async () => { const eps=[...(appState.episodes||[])]; let ep=eps.find(e=>e.number===episodeRecap.episode); if(!ep){ep={number:episodeRecap.episode,events:[],recap:""};eps.push(ep);} ep.recap=episodeRecap.text; eps.sort((a,b)=>a.number-b.number); await saveState({...appState,episodes:eps}); };
+  const renameTeam = async (old) => { if(!newTeamName.trim()||newTeamName===old){setEditingTeamName(null);return;} const teams={...appState.teams}; teams[newTeamName]={...teams[old]}; delete teams[old]; await saveState({...appState,teams}); setEditingTeamName(null); setNewTeamName(""); };
+  const saveMotto = async (tn) => { const teams={...appState.teams}; if(teams[tn])teams[tn].motto=newMotto; await saveState({...appState,teams}); setEditingMotto(null); setNewMotto(""); };
+
+  if (loading) return (<div style={S.loadingScreen}><style>{globalStyles}</style><TorchIcon size={64}/><p style={{color:"#FF8C42",fontFamily:"'Cinzel',serif",marginTop:16,fontSize:18}}>Loading...</p></div>);
+
+  // LOGIN
+  if (view === "login" && !devMode) {
+    return (
+      <div style={S.loginScreen}><style>{globalStyles}</style><FireParticles/>
+        <div style={S.loginCard}>
+          <div style={{textAlign:"center",marginBottom:32}}><TorchIcon size={48}/><h1 style={S.title}>FANTASY SURVIVOR</h1><p style={S.subtitle}>SEASON 50 · IN THE HANDS OF THE FANS</p></div>
+          <div style={S.tabRow}>
+            <button onClick={()=>{setIsRegistering(false);setError("");}} style={{...S.tab,...(!isRegistering?S.tabActive:{})}}>Sign In</button>
+            <button onClick={()=>{setIsRegistering(true);setError("");}} style={{...S.tab,...(isRegistering?S.tabActive:{})}}>Register</button>
+          </div>
+          <input style={S.input} placeholder="Your name" value={loginName} onChange={e=>setLoginName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+          <input style={S.input} type="password" placeholder="Password" value={loginPass} onChange={e=>setLoginPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+          {isRegistering&&(appState.commissioners||[]).length===0&&(<label style={S.checkboxLabel}><input type="checkbox" checked={isCommish} onChange={e=>setIsCommish(e.target.checked)} style={{marginRight:8}}/>I'm the commissioner</label>)}
+          {error&&<p style={S.error}>{error}</p>}
+          <button style={S.primaryBtn} onClick={handleLogin}>{isRegistering?"Join the Island":"Enter Tribal"}</button>
+          {Object.keys(appState.users).length>0&&(<p style={S.hint}>{Object.keys(appState.users).length} player{Object.keys(appState.users).length!==1?"s":""} registered{(appState.commissioners||[]).length>0&&` · Commish: ${(appState.commissioners||[]).map(c=>appState.users[c]?.displayName).join(", ")}`}</p>)}
+        </div>
+      </div>
+    );
+  }
+
+  // Dev mode bypass: show login AND app
+  if (view === "login" && devMode) {
+    return (
+      <div style={S.loginScreen}><style>{globalStyles}</style><FireParticles/>
+        <div style={{...S.loginCard, maxWidth: 600}}>
+          <div style={{textAlign:"center",marginBottom:16}}><TorchIcon size={48}/><h1 style={S.title}>FANTASY SURVIVOR</h1><p style={S.subtitle}>DEV MODE ACTIVE</p></div>
+          <DevPanel appState={appState} saveState={saveState} setCurrentUser={(u) => { setCurrentUser(u); setView("dashboard"); }} currentUser={currentUser} />
+          <hr style={{ border: "none", borderTop: "1px solid rgba(255,140,66,0.15)", margin: "16px 0" }} />
+          <div style={S.tabRow}>
+            <button onClick={()=>{setIsRegistering(false);setError("");}} style={{...S.tab,...(!isRegistering?S.tabActive:{})}}>Sign In</button>
+            <button onClick={()=>{setIsRegistering(true);setError("");}} style={{...S.tab,...(isRegistering?S.tabActive:{})}}>Register</button>
+          </div>
+          <input style={S.input} placeholder="Your name" value={loginName} onChange={e=>setLoginName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+          <input style={S.input} type="password" placeholder="Password" value={loginPass} onChange={e=>setLoginPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+          {isRegistering&&(appState.commissioners||[]).length===0&&(<label style={S.checkboxLabel}><input type="checkbox" checked={isCommish} onChange={e=>setIsCommish(e.target.checked)} style={{marginRight:8}}/>I'm the commissioner</label>)}
+          {error&&<p style={S.error}>{error}</p>}
+          <button style={S.primaryBtn} onClick={handleLogin}>{isRegistering?"Join the Island":"Enter Tribal"}</button>
+        </div>
+      </div>
+    );
+  }
+
+  const contestantScores = getContestantScores();
+  const teamScores = getTeamScores();
+  const sortedTeams = Object.entries(teamScores).sort((a,b)=>b[1].total-a[1].total);
+  const myTeam = getUserTeam(currentUser);
+  const eliminated = appState.eliminated || [];
+
+  return (
+    <div style={S.appContainer}><style>{globalStyles}</style><FireParticles/>
+      {appState.announcement&&<div style={S.announcementBanner}><span style={{marginRight:8}}>📣</span>{appState.announcement}</div>}
+      <header style={S.header}>
+        <div style={S.headerLeft}><TorchIcon size={28}/><div><h1 style={S.headerTitle}>{appState.leagueName}</h1><p style={S.headerSub}>Season 50</p></div></div>
+        <div style={S.headerRight}><span style={S.userName}>{appState.users[currentUser]?.displayName}</span>{isUserCommissioner&&<span style={S.commBadge}>COMMISH</span>}{devMode&&<span style={{...S.commBadge,background:"rgba(74,222,128,0.2)",color:"#4ADE80"}}>DEV</span>}<button style={S.logoutBtn} onClick={()=>{setCurrentUser(null);setView("login");}}>Logout</button></div>
+      </header>
+      <nav style={S.nav}>
+        {["dashboard","leaderboard","castStatus","scores","rules"].map(v=>(<button key={v} onClick={()=>setView(v)} style={{...S.navBtn,...(view===v?S.navBtnActive:{})}}>{v==="dashboard"?"Home":v==="leaderboard"?"Leaderboard":v==="castStatus"?"Cast":v==="scores"?"Scores":"Rules"}</button>))}
+        {isUserCommissioner&&<button onClick={()=>setView("admin")} style={{...S.navBtn,...(view==="admin"?S.navBtnActive:{}),color:"#FF6B35"}}>Commissioner</button>}
+      </nav>
+      <main style={S.main}>
+        {devMode && <DevPanel appState={appState} saveState={saveState} setCurrentUser={setCurrentUser} currentUser={currentUser} />}
+        {/* DASHBOARD */}
+        {view==="dashboard"&&(<div>
+          {myTeam?(<div style={S.card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+              <div style={{flex:1}}>
+                {editingTeamName===myTeam[0]?(<div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}><input style={{...S.input,marginBottom:0,flex:1}} value={newTeamName} onChange={e=>setNewTeamName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&renameTeam(myTeam[0])} autoFocus/><button style={S.smallBtn} onClick={()=>renameTeam(myTeam[0])}>Save</button><button style={S.smallBtnGhost} onClick={()=>setEditingTeamName(null)}>Cancel</button></div>):(<h2 style={{...S.cardTitle,cursor:"pointer"}} onClick={()=>{setEditingTeamName(myTeam[0]);setNewTeamName(myTeam[0]);}}><span style={{color:"#FF8C42"}}>🔥</span> {myTeam[0]} <span style={{fontSize:12,color:"#A89070"}}>✏️</span></h2>)}
+                {editingMotto===myTeam[0]?(<div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}><input style={{...S.input,marginBottom:0,flex:1}} placeholder="Enter your team motto..." maxLength={80} value={newMotto} onChange={e=>setNewMotto(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveMotto(myTeam[0])} autoFocus/><button style={S.smallBtn} onClick={()=>saveMotto(myTeam[0])}>Save</button><button style={S.smallBtnGhost} onClick={()=>setEditingMotto(null)}>Cancel</button></div>):(<p style={{color:"#A89070",fontSize:14,fontStyle:"italic",cursor:"pointer",marginBottom:8}} onClick={()=>{setEditingMotto(myTeam[0]);setNewMotto(myTeam[1].motto||"");}}>{myTeam[1].motto||"Click to add a team motto..."}</p>)}
+              </div>
+            </div>
+            <p style={S.teamTotal}>{teamScores[myTeam[0]]?.total||0} <span style={{fontSize:16,opacity:0.6}}>pts</span></p>
+            {teamScores[myTeam[0]]?.progression?.length>1&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><MiniChart data={teamScores[myTeam[0]].progression} width={280} height={50}/></div>}
+            <div style={S.memberGrid}>{myTeam[1].members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const isE=eliminated.includes(m);return(<div key={m} style={{...S.memberCard,opacity:isE?0.5:1}}><div style={{...S.tribeDot,background:TRIBE_COLORS[c?.tribe]||"#666"}}/><div style={{flex:1}}><p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m}</p><p style={S.memberTribe}>{c?.tribe}{isE?" · Eliminated":""}</p></div><p style={S.memberScore}>{contestantScores[m]?.total||0}</p></div>);})}</div>
+          </div>):(<div style={S.card}><h2 style={S.cardTitle}>No Team Yet</h2><p style={{color:"#A89070"}}>{isUserCommissioner?"Head to the Commissioner tab to set up teams.":"The commissioner hasn't set up your team yet."}</p></div>)}
+          <div style={S.card}><h2 style={S.cardTitle}>Standings</h2>
+            {sortedTeams.length>0?sortedTeams.map(([name,data],i)=>(<div key={name} style={{...S.standingRow,background:myTeam&&myTeam[0]===name?"rgba(255,107,53,0.1)":"transparent",borderLeft:i===0?"3px solid #FFD93D":"3px solid transparent"}}><span style={S.standingRank}>#{i+1}</span><div style={{flex:1}}><span style={S.standingName}>{name}</span>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div><span style={S.standingOwner}>{appState.users[data.owner]?.displayName}</span><span style={S.standingScore}>{data.total}</span></div>)):<p style={{color:"#A89070"}}>No teams set up yet.</p>}
+          </div>
+          {appState.episodes.filter(ep=>ep.recap).length>0&&(<div style={S.card}><h2 style={S.cardTitle}>Episode Recaps</h2>{[...appState.episodes].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number).slice(0,3).map(ep=>(<div key={ep.number} style={{marginBottom:16,padding:12,background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:"3px solid #FF8C42"}}><p style={S.epLabel}>Episode {ep.number}</p><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.5}}>{ep.recap}</p></div>))}</div>)}
+          {appState.episodes.length>0&&(<div style={S.card}><h2 style={S.cardTitle}>Latest Events</h2>{[...appState.episodes].sort((a,b)=>b.number-a.number).slice(0,3).map(ep=>(<div key={ep.number} style={{marginBottom:16}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={S.eventRow}><span style={{...S.eventContestant,textDecoration:eliminated.includes(ev.contestant)?"line-through":"none"}}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span></div>))}</div>))}</div>)}
+        </div>)}
+
+        {/* LEADERBOARD */}
+        {view==="leaderboard"&&(<div>
+          <div style={S.card}><h2 style={S.cardTitle}>Team Leaderboard</h2>
+            {sortedTeams.map(([name,data],i)=>(<div key={name} style={S.leaderboardCard} onClick={()=>setExpandedTeam(expandedTeam===name?null:name)}>
+              <div style={S.leaderboardHeader}>
+                <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{...S.rankBadge,background:i===0?"linear-gradient(135deg,#FFD93D,#FF8C42)":i===1?"linear-gradient(135deg,#C0C0C0,#A0A0A0)":i===2?"linear-gradient(135deg,#CD7F32,#A0622E)":"#3D3020"}}>{i+1}</span><div><p style={S.lbTeamName}>{name}</p><p style={S.lbOwner}>{appState.users[data.owner]?.displayName}</p>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div></div>
+                <div style={{textAlign:"right"}}><p style={S.lbTotal}>{data.total}</p>{data.progression?.length>1&&<MiniChart data={data.progression} width={120} height={30}/>}</div>
+              </div>
+              {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=eliminated.includes(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:TRIBE_COLORS[c?.tribe]||"#666"}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
+            </div>))}
+            {sortedTeams.length===0&&<p style={{color:"#A89070"}}>No teams yet.</p>}
+          </div>
+          <div style={S.card}><h2 style={S.cardTitle}>Individual Leaderboard</h2>
+            {CONTESTANTS.filter(c=>contestantScores[c.name]?.total!==0).sort((a,b)=>(contestantScores[b.name]?.total||0)-(contestantScores[a.name]?.total||0)).map((c,i)=>(<div key={c.name} style={S.eventRow}><span style={{color:"#A89070",width:30,fontWeight:600}}>#{i+1}</span><div style={{...S.tribeDot,background:TRIBE_COLORS[c.tribe]}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:eliminated.includes(c.name)?"line-through":"none",opacity:eliminated.includes(c.name)?0.5:1}}>{c.name} {eliminated.includes(c.name)&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:700}}>{contestantScores[c.name]?.total}</span></div>))}
+            {CONTESTANTS.every(c=>contestantScores[c.name]?.total===0)&&<p style={{color:"#A89070"}}>No scores yet.</p>}
+          </div>
+        </div>)}
+
+        {/* CAST */}
+        {view==="castStatus"&&(<div>{["Cila","Kalo","Vatu"].map(tribe=>(<div key={tribe} style={{...S.card,borderLeft:`3px solid ${TRIBE_COLORS[tribe]}`}}><h2 style={{...S.cardTitle,color:TRIBE_COLORS[tribe]}}>{tribe} Tribe</h2>{CONTESTANTS.filter(c=>c.tribe===tribe).map(c=>{const isE=eliminated.includes(c.name);const owner=Object.entries(appState.teams||{}).find(([_,t])=>t.members.includes(c.name));return(<div key={c.name} style={{...S.eventRow,opacity:isE?0.45:1}}>{isE?<SkullIcon size={14}/>:<div style={{...S.tribeDot,background:TRIBE_COLORS[tribe]}}/>}<div style={{flex:1}}><span style={{color:"#E8D5B5",fontWeight:500,textDecoration:isE?"line-through":"none"}}>{c.name}</span><span style={{color:"#A89070",fontSize:12,marginLeft:8}}>S{c.season}</span></div>{owner&&<span style={{fontSize:12,color:"#A89070",padding:"2px 8px",background:"rgba(255,255,255,0.05)",borderRadius:4}}>{owner[0]}</span>}<span style={{color:"#FF8C42",fontWeight:600,minWidth:30,textAlign:"right"}}>{contestantScores[c.name]?.total||0}</span></div>);})}</div>))}</div>)}
+
+        {/* SCORES */}
+        {view==="scores"&&(<div>
+          {isUserCommissioner||devMode?(<>
+            <div style={S.card}><h2 style={S.cardTitle}>Enter Episode Events</h2>
+              <div style={S.formRow}><label style={S.formLabel}>Episode #</label><input type="number" min="1" max="20" value={eventForm.episode} onChange={e=>setEventForm({...eventForm,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/></div>
+              <div style={S.formRow}><label style={S.formLabel}>Contestant</label><select value={eventForm.contestant} onChange={e=>setEventForm({...eventForm,contestant:e.target.value})} style={S.select}><option value="">Select contestant...</option>{CONTESTANTS.filter(c=>!eliminated.includes(c.name)).map(c=>(<option key={c.name} value={c.name}>{c.name} ({c.tribe})</option>))}{eliminated.length>0&&<optgroup label="── Eliminated ──">{CONTESTANTS.filter(c=>eliminated.includes(c.name)).map(c=>(<option key={c.name} value={c.name}>☠ {c.name}</option>))}</optgroup>}</select></div>
+              <div style={S.formRow}><label style={S.formLabel}>Event</label><select value={eventForm.event} onChange={e=>setEventForm({...eventForm,event:e.target.value})} style={S.select}><option value="">Select event...</option>{Object.entries(SCORING_RULES).map(([k,r])=>(<option key={k} value={k}>{r.label} ({r.points>0?"+":""}{r.points})</option>))}</select></div>
+              <button style={S.primaryBtn} onClick={addEvent}>Add Event</button>
+            </div>
+            <div style={S.card}><h2 style={S.cardTitle}>Episode Recap</h2><div style={S.formRow}><label style={S.formLabel}>Episode #</label><input type="number" min="1" max="20" value={episodeRecap.episode} onChange={e=>setEpisodeRecap({...episodeRecap,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/></div><textarea style={{...S.input,minHeight:80,resize:"vertical"}} placeholder="What happened this episode..." value={episodeRecap.text} onChange={e=>setEpisodeRecap({...episodeRecap,text:e.target.value})}/><button style={S.primaryBtn} onClick={saveRecap}>Save Recap</button></div>
+            <div style={S.card}><h2 style={S.cardTitle}>Event Log</h2>{[...appState.episodes].sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:20}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={{...S.eventRow,alignItems:"center"}}><span style={S.eventContestant}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span><button onClick={()=>removeEvent(ep.number,i)} style={S.removeBtn}>✕</button></div>))}</div>))}{appState.episodes.length===0&&<p style={{color:"#A89070"}}>No events recorded yet.</p>}</div>
+          </>):(<div style={S.card}><h2 style={S.cardTitle}>Scores</h2><p style={{color:"#A89070",marginBottom:16}}>Only commissioners can enter scores.</p>{appState.episodes.length>0&&[...appState.episodes].sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:20}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.recap&&<p style={{color:"#A89070",fontSize:14,fontStyle:"italic",marginBottom:8}}>{ep.recap}</p>}{ep.events.map((ev,i)=>(<div key={i} style={S.eventRow}><span style={S.eventContestant}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span></div>))}</div>))}</div>)}
+        </div>)}
+
+        {/* RULES */}
+        {view==="rules"&&(<div style={S.card}><h2 style={S.cardTitle}>Scoring Rules</h2><div style={{display:"grid",gap:8}}>{Object.entries(SCORING_RULES).map(([k,r])=>(<div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:`3px solid ${r.points>=0?"#4ADE80":"#F87171"}`}}><span style={{color:"#E8D5B5"}}>{r.label}</span><span style={{fontWeight:700,fontSize:18,fontFamily:"'Cinzel',serif",color:r.points>=0?"#4ADE80":"#F87171"}}>{r.points>0?"+":""}{r.points}</span></div>))}</div></div>)}
+
+        {/* ADMIN */}
+        {view==="admin"&&(isUserCommissioner||devMode)&&(<div>
+          <div style={S.card}><h2 style={S.cardTitle}>League Announcement</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Shows as a banner at the top for all players.</p><input style={S.input} placeholder="e.g. Draft party Saturday at 7pm!" value={announcementDraft||appState.announcement} onChange={e=>setAnnouncementDraft(e.target.value)}/><div style={{display:"flex",gap:8}}><button style={{...S.primaryBtn,flex:1}} onClick={()=>saveState({...appState,announcement:announcementDraft})}>Update</button><button style={{...S.smallBtnGhost,padding:"12px 16px"}} onClick={()=>{saveState({...appState,announcement:""});setAnnouncementDraft("");}}>Clear</button></div></div>
+          <div style={S.card}><h2 style={S.cardTitle}>Commissioner Powers</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Grant or revoke commissioner access.</p>{Object.entries(appState.users).map(([key,u])=>{const isC=(appState.commissioners||[]).includes(key);return(<div key={key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{color:"#E8D5B5"}}>{u.displayName}</span>{isC&&<span style={S.commBadge}>COMMISH</span>}</div>{key!==currentUser&&<button style={isC?S.removeBtn:S.editBtn} onClick={()=>toggleCommissioner(key)}>{isC?"Revoke":"Grant"}</button>}</div>);})}</div>
+          <div style={S.card}><h2 style={S.cardTitle}>Elimination Tracker</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Mark contestants as eliminated.</p><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const isE=eliminated.includes(c.name);return(<button key={c.name} onClick={()=>toggleEliminated(c.name)} style={{...S.contestantChip,background:isE?"rgba(248,113,113,0.2)":"rgba(255,255,255,0.05)",color:isE?"#F87171":"#A89070",borderColor:isE?"rgba(248,113,113,0.4)":"rgba(255,255,255,0.1)",textDecoration:isE?"line-through":"none"}}>{isE&&"☠ "}{c.name}</button>);})}</div></div>
+          <div style={S.card}><h2 style={S.cardTitle}>Manage Teams</h2>
+            <div style={S.formRow}><label style={S.formLabel}>Team Name</label><input style={S.input} placeholder="e.g. Kaloboration" value={teamDraft.teamName} onChange={e=>setTeamDraft({...teamDraft,teamName:e.target.value})}/></div>
+            <div style={S.formRow}><label style={S.formLabel}>Team Owner</label><select value={teamDraft.editOwner||""} onChange={e=>setTeamDraft({...teamDraft,editOwner:e.target.value})} style={S.select}><option value="">Select owner...</option>{Object.entries(appState.users).map(([k,u])=>(<option key={k} value={k}>{u.displayName}</option>))}</select></div>
+            <div style={S.formRow}><label style={S.formLabel}>Contestants ({teamDraft.members.length} selected)</label><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const sel=teamDraft.members.includes(c.name);return(<button key={c.name} onClick={()=>setTeamDraft({...teamDraft,members:sel?teamDraft.members.filter(m=>m!==c.name):[...teamDraft.members,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)"}}>{c.name}</button>);})}</div></div>
+            <button style={S.primaryBtn} onClick={saveTeam}>Save Team</button>
+          </div>
+          <div style={S.card}><h2 style={S.cardTitle}>Current Teams</h2>{Object.entries(appState.teams||{}).map(([name,team])=>(<div key={name} style={S.existingTeam}><div style={{flex:1}}><p style={{color:"#E8D5B5",fontWeight:700,marginBottom:4}}>{name}</p><p style={{color:"#A89070",fontSize:13,marginBottom:2}}>Owner: {appState.users[team.owner]?.displayName}</p>{team.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginBottom:6}}>"{team.motto}"</p>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{team.members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);return(<span key={m} style={{fontSize:12,padding:"2px 8px",borderRadius:4,background:TRIBE_COLORS[c?.tribe]+"33",color:TRIBE_COLORS[c?.tribe],textDecoration:eliminated.includes(m)?"line-through":"none"}}>{m}</span>);})}</div></div><div style={{display:"flex",gap:8}}><button style={S.editBtn} onClick={()=>setTeamDraft({teamName:name,members:[...team.members],editOwner:team.owner,editKey:name})}>Edit</button><button style={S.removeBtn} onClick={()=>deleteTeam(name)}>Delete</button></div></div>))}{Object.keys(appState.teams||{}).length===0&&<p style={{color:"#A89070"}}>No teams created yet.</p>}</div>
+          <div style={S.card}><h2 style={S.cardTitle}>League Settings</h2><div style={S.formRow}><label style={S.formLabel}>League Name</label><input style={S.input} value={appState.leagueName} onChange={e=>saveState({...appState,leagueName:e.target.value})}/></div></div>
+          <div style={{...S.card,borderColor:"rgba(248,113,113,0.3)"}}><h2 style={{...S.cardTitle,color:"#F87171"}}>Danger Zone</h2><button style={{...S.removeBtn,padding:"8px 16px",fontSize:14}} onClick={async()=>{if(confirm("Reset ALL data? This cannot be undone.")){await saveState(DEFAULT_STATE);setCurrentUser(null);setView("login");}}}>Reset Entire League</button></div>
+        </div>)}
+      </main>
+    </div>
+  );
+}
+
+const globalStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:wght@300;400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#1A0F05;font-family:'Crimson Pro',Georgia,serif;color:#E8D5B5;-webkit-font-smoothing:antialiased}
+  @keyframes fireFloat{0%{opacity:0;transform:translateY(0) scale(1)}20%{opacity:0.8}100%{opacity:0;transform:translateY(-100vh) scale(0.2)}}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#FF8C42;box-shadow:0 0 0 2px rgba(255,140,66,0.2)}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#1A0F05}::-webkit-scrollbar-thumb{background:#3D3020;border-radius:3px}
+  select option{background:#2A1A0A;color:#E8D5B5}textarea{font-family:'Crimson Pro',serif}
+`;
+
+const S = {
+  loadingScreen:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#1A0F05"},
+  loginScreen:{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"linear-gradient(180deg,#1A0F05 0%,#2A1508 50%,#1A0F05 100%)",padding:20,position:"relative"},
+  loginCard:{background:"rgba(42,26,10,0.9)",border:"1px solid rgba(255,140,66,0.2)",borderRadius:16,padding:40,width:"100%",maxWidth:420,backdropFilter:"blur(20px)",position:"relative",zIndex:1},
+  title:{fontFamily:"'Cinzel',serif",fontSize:28,fontWeight:900,color:"#FFD93D",letterSpacing:3,marginTop:12,textShadow:"0 2px 20px rgba(255,217,61,0.3)"},
+  subtitle:{fontFamily:"'Cinzel',serif",fontSize:12,letterSpacing:4,color:"#A89070",marginTop:4},
+  tabRow:{display:"flex",gap:0,marginBottom:20,borderRadius:8,overflow:"hidden",border:"1px solid rgba(255,255,255,0.1)"},
+  tab:{flex:1,padding:"10px 16px",border:"none",background:"transparent",color:"#A89070",fontFamily:"'Cinzel',serif",fontSize:13,cursor:"pointer"},
+  tabActive:{background:"rgba(255,140,66,0.15)",color:"#FF8C42"},
+  input:{width:"100%",padding:"12px 16px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#E8D5B5",fontSize:16,fontFamily:"'Crimson Pro',serif",marginBottom:12},
+  select:{width:"100%",padding:"12px 16px",background:"rgba(42,26,10,0.95)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#E8D5B5",fontSize:16,fontFamily:"'Crimson Pro',serif",marginBottom:12,cursor:"pointer"},
+  checkboxLabel:{display:"flex",alignItems:"center",color:"#A89070",fontSize:14,marginBottom:16,cursor:"pointer"},
+  error:{color:"#F87171",fontSize:14,marginBottom:12,textAlign:"center"},
+  hint:{color:"#A89070",fontSize:13,textAlign:"center",marginTop:16},
+  primaryBtn:{width:"100%",padding:"14px 24px",background:"linear-gradient(135deg,#FF6B35,#FF8C42)",border:"none",borderRadius:8,color:"#fff",fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:700,letterSpacing:1,cursor:"pointer",textTransform:"uppercase"},
+  smallBtn:{padding:"8px 16px",background:"linear-gradient(135deg,#FF6B35,#FF8C42)",border:"none",borderRadius:6,color:"#fff",fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,cursor:"pointer"},
+  smallBtnGhost:{padding:"8px 16px",background:"transparent",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#A89070",fontFamily:"'Cinzel',serif",fontSize:12,cursor:"pointer"},
+  announcementBanner:{background:"linear-gradient(90deg,rgba(255,107,53,0.15),rgba(255,140,66,0.08))",borderBottom:"1px solid rgba(255,140,66,0.2)",padding:"10px 24px",color:"#FFD93D",fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:600,letterSpacing:0.5,textAlign:"center",position:"relative",zIndex:10},
+  appContainer:{minHeight:"100vh",background:"linear-gradient(180deg,#1A0F05 0%,#2A1508 30%,#1A0F05 100%)",position:"relative"},
+  header:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 24px",borderBottom:"1px solid rgba(255,140,66,0.15)",background:"rgba(26,15,5,0.95)",backdropFilter:"blur(10px)",position:"sticky",top:0,zIndex:10,flexWrap:"wrap",gap:8},
+  headerLeft:{display:"flex",alignItems:"center",gap:12},headerTitle:{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:"#FFD93D",letterSpacing:1},
+  headerSub:{fontSize:11,color:"#A89070",letterSpacing:2,fontFamily:"'Cinzel',serif"},headerRight:{display:"flex",alignItems:"center",gap:12},
+  userName:{color:"#E8D5B5",fontWeight:500},commBadge:{fontSize:10,padding:"2px 8px",borderRadius:4,background:"rgba(255,107,53,0.2)",color:"#FF8C42",fontFamily:"'Cinzel',serif",fontWeight:700,letterSpacing:1},
+  logoutBtn:{padding:"6px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#A89070",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
+  nav:{display:"flex",gap:4,padding:"8px 24px",borderBottom:"1px solid rgba(255,140,66,0.08)",background:"rgba(26,15,5,0.8)",overflowX:"auto",flexWrap:"wrap"},
+  navBtn:{padding:"8px 16px",background:"transparent",border:"none",borderRadius:6,color:"#A89070",fontFamily:"'Cinzel',serif",fontSize:13,cursor:"pointer",whiteSpace:"nowrap"},
+  navBtnActive:{background:"rgba(255,140,66,0.12)",color:"#FF8C42"},
+  main:{maxWidth:800,margin:"0 auto",padding:"24px 16px",position:"relative",zIndex:1},
+  card:{background:"rgba(42,26,10,0.6)",border:"1px solid rgba(255,140,66,0.12)",borderRadius:12,padding:24,marginBottom:20,backdropFilter:"blur(10px)"},
+  cardTitle:{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:"#FFD93D",marginBottom:16,letterSpacing:1},
+  teamTotal:{fontSize:48,fontWeight:900,fontFamily:"'Cinzel',serif",color:"#FF8C42",textAlign:"center",margin:"12px 0 16px",textShadow:"0 2px 30px rgba(255,140,66,0.3)"},
+  memberGrid:{display:"grid",gap:10},memberCard:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"rgba(255,255,255,0.03)",borderRadius:8},
+  tribeDot:{width:10,height:10,borderRadius:"50%",flexShrink:0},memberName:{color:"#E8D5B5",fontWeight:600,fontSize:15},memberTribe:{color:"#A89070",fontSize:13},
+  memberScore:{marginLeft:"auto",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:"#FF8C42"},
+  standingRow:{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",borderRadius:6,marginBottom:4},
+  standingRank:{fontFamily:"'Cinzel',serif",fontWeight:700,color:"#A89070",width:30},standingName:{fontWeight:600,color:"#E8D5B5"},
+  standingOwner:{color:"#A89070",fontSize:13,minWidth:60,textAlign:"right"},standingScore:{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:18,color:"#FF8C42",minWidth:40,textAlign:"right"},
+  leaderboardCard:{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:16,marginBottom:12,cursor:"pointer"},
+  leaderboardHeader:{display:"flex",justifyContent:"space-between",alignItems:"center"},
+  rankBadge:{width:32,height:32,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:14,color:"#1A0F05"},
+  lbTeamName:{fontFamily:"'Cinzel',serif",fontWeight:700,color:"#E8D5B5",fontSize:16},lbOwner:{color:"#A89070",fontSize:13},
+  lbTotal:{fontFamily:"'Cinzel',serif",fontSize:28,fontWeight:900,color:"#FFD93D"},
+  lbMembers:{display:"grid",gap:6,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:12,marginTop:12},
+  lbMemberRow:{display:"flex",alignItems:"center",gap:8,padding:"4px 0"},
+  epLabel:{fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,color:"#FF8C42",marginBottom:8,letterSpacing:1},
+  eventRow:{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",borderRadius:6,marginBottom:4,background:"rgba(255,255,255,0.02)"},
+  eventContestant:{flex:1,color:"#E8D5B5",fontWeight:500,fontSize:14},eventLabel:{color:"#A89070",fontSize:13},
+  eventPoints:{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:14,minWidth:32,textAlign:"right"},
+  formRow:{marginBottom:16},formLabel:{display:"block",fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:600,color:"#A89070",marginBottom:6,letterSpacing:1,textTransform:"uppercase"},
+  contestantPicker:{display:"flex",flexWrap:"wrap",gap:6},
+  contestantChip:{padding:"6px 12px",borderRadius:20,border:"1px solid",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
+  existingTeam:{display:"flex",alignItems:"center",gap:12,padding:16,background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:8,flexWrap:"wrap"},
+  editBtn:{padding:"6px 14px",background:"rgba(255,140,66,0.15)",border:"1px solid rgba(255,140,66,0.3)",borderRadius:6,color:"#FF8C42",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
+  removeBtn:{padding:"4px 10px",background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:6,color:"#F87171",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
+};
+
+export default App;
