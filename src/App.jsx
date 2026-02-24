@@ -102,14 +102,25 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
     return () => document.removeEventListener("touchstart", handler);
   }, [activeEmoji]);
 
+  const [tooltipLeft, setTooltipLeft] = useState(0);
+
   const showTooltip = (emoji, btnEl) => {
     setActiveEmoji(emoji);
-    // Compute arrow offset: center of button relative to wrapper left
     if (btnEl && wrapperRef.current) {
       const btnRect = btnEl.getBoundingClientRect();
       const wrapRect = wrapperRef.current.getBoundingClientRect();
-      const center = btnRect.left + btnRect.width / 2 - wrapRect.left;
-      setArrowOffset(Math.max(8, Math.round(center) - 5));
+      // Pill center relative to wrapper
+      const pillCenter = btnRect.left + btnRect.width / 2 - wrapRect.left;
+      // Estimate tooltip width (rough: ~12px per char, min 80)
+      const names = getNames(reactions[emoji] || []);
+      const tooltipW = Math.max(80, (emoji.length + 1 + names.length) * 8 + 20);
+      // Ideal tooltip left: centered over pill
+      const ideal = pillCenter - tooltipW / 2;
+      // Clamp so tooltip stays within wrapper
+      const clamped = Math.max(0, Math.min(ideal, wrapRect.width - tooltipW));
+      // Arrow points at pill center, relative to where tooltip actually landed
+      setTooltipLeft(clamped);
+      setArrowOffset(Math.max(8, Math.min(pillCenter - clamped - 5, tooltipW - 16)));
     }
   };
 
@@ -135,11 +146,11 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
   return (
     <div ref={wrapperRef} style={{ marginTop: 6, position: "relative" }}>
 
-      {/* Tooltip: left-anchored so it never clips outside the card.
-          Arrow offset computed per-pill so it points at the right emoji. */}
+      {/* Tooltip: centered over hovered pill, clamped within wrapper bounds.
+          Arrow offset tracks pill center so it always points correctly. */}
       {activeEmoji && (reactions[activeEmoji] || []).length > 0 && (
         <div style={{
-          position: "absolute", bottom: "calc(100% + 5px)", left: 0,
+          position: "absolute", bottom: "calc(100% + 5px)", left: tooltipLeft,
           background: "rgba(26,15,5,0.97)", border: "1px solid rgba(255,140,66,0.25)",
           borderRadius: 8, padding: "4px 10px", whiteSpace: "nowrap",
           fontSize: 12, color: "#E8D5B5", pointerEvents: "none",
