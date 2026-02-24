@@ -94,7 +94,7 @@ function App() {
   const devMode = useDevMode();
   const [appState, setAppState] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
-  const [view, setView] = useState("login");
+  const [view, setView] = useState(localStorage.getItem("bc_user") ? "dashboard" : "login");
   const [loading, setLoading] = useState(true);
   const [loginName, setLoginName] = useState("");
   const [loginPass, setLoginPass] = useState("");
@@ -111,6 +111,12 @@ function App() {
   const [announcementDraft, setAnnouncementDraft] = useState("");
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [expandedCast, setExpandedCast] = useState(null);
+
+  // Restore saved session
+  useEffect(() => {
+    const saved = localStorage.getItem("bc_user");
+    if (saved) setCurrentUser(saved);
+  }, []);
 
   // Load initial state, then subscribe to real-time updates
   useEffect(() => {
@@ -148,11 +154,11 @@ function App() {
       const isFirst = Object.keys(appState.users).length === 0;
       const willBeCommish = isCommish && (appState.commissioners||[]).length === 0;
       await saveState({ ...appState, users: { ...appState.users, [name]: { displayName: loginName.trim(), password: loginPass } }, commissioners: willBeCommish || isFirst ? [...(appState.commissioners||[]), name] : (appState.commissioners||[]) });
-      setCurrentUser(name); setView("dashboard");
+      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("dashboard");
     } else {
       const user = appState.users[name];
       if (!user || user.password !== loginPass) { setError("Invalid name or password"); return; }
-      setCurrentUser(name); setView("dashboard");
+      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("dashboard");
     }
   };
 
@@ -241,7 +247,7 @@ function App() {
       {appState.announcement&&<div style={S.announcementBanner}><span style={{marginRight:8}}>📣</span>{appState.announcement}</div>}
       <header style={S.header}>
         <div style={S.headerLeft}><TorchIcon size={28}/><div><h1 style={S.headerTitle}>{appState.leagueName}</h1><p style={S.headerSub}>Season 50</p></div></div>
-        <div style={S.headerRight}><span style={S.userName}>{appState.users[currentUser]?.displayName}</span>{isUserCommissioner&&<span style={S.commBadge}>COMMISH</span>}{devMode&&<span style={{...S.commBadge,background:"rgba(74,222,128,0.2)",color:"#4ADE80"}}>DEV</span>}<button style={S.logoutBtn} onClick={()=>{setCurrentUser(null);setView("login");}}>Logout</button></div>
+        <div style={S.headerRight}><span style={S.userName}>{appState.users[currentUser]?.displayName}</span>{isUserCommissioner&&<span style={S.commBadge}>COMMISH</span>}{devMode&&<span style={{...S.commBadge,background:"rgba(74,222,128,0.2)",color:"#4ADE80"}}>DEV</span>}<button style={S.logoutBtn} onClick={()=>{localStorage.removeItem("bc_user");setCurrentUser(null);setView("login");}}>Logout</button></div>
       </header>
       <nav style={S.nav}>
         {["dashboard","leaderboard","castStatus","scores","rules"].map(v=>(<button key={v} onClick={()=>setView(v)} style={{...S.navBtn,...(view===v?S.navBtnActive:{})}}>{v==="dashboard"?"Home":v==="leaderboard"?"Leaderboard":v==="castStatus"?"Cast":v==="scores"?"Scores":"Rules"}</button>))}
