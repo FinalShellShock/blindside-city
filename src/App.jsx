@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
 import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, getPortraitUrl } from "./gameData.js";
 
-// ── Dev mode: access via ?dev=torchsnuffer ──
+// ── Dev mode: access via ?dev=torchsnuffer ── v2
 const DEV_PASSWORD = "torchsnuffer";
 function useDevMode() {
   const [active, setActive] = useState(false);
