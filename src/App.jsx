@@ -30,7 +30,6 @@ function useDevMode() {
 function Portrait({ slug, tribe, size = 36, eliminated = false }) {
   const [failed, setFailed] = useState(false);
   if (failed || !slug) {
-    // Fallback: colored circle with first initial
     const initial = (slug || "?").charAt(0).toUpperCase();
     return (
       <div style={{ width: size, height: size, borderRadius: "50%", background: TRIBE_COLORS[tribe] || "#3D3020", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: size * 0.4, flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${TRIBE_COLORS[tribe] || "#3D3020"}` }}>
@@ -39,10 +38,7 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
     );
   }
   return (
-    <img
-      src={getPortraitUrl(slug)}
-      alt={slug}
-      onError={() => setFailed(true)}
+    <img src={getPortraitUrl(slug)} alt={slug} onError={() => setFailed(true)}
       style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${TRIBE_COLORS[tribe] || "#3D3020"}`, filter: eliminated ? "grayscale(100%)" : "none" }}
     />
   );
@@ -63,7 +59,6 @@ function DevPanel({ appState, saveState, setCurrentUser, currentUser }) {
   return (
     <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
       <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 16, color: "#4ADE80", marginBottom: 12, letterSpacing: 1 }}>🛠 DEV MODE</h2>
-
       <div style={{ marginBottom: 12 }}>
         <p style={{ color: "#4ADE80", fontSize: 13, marginBottom: 6, fontWeight: 600 }}>Impersonate User</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -74,27 +69,13 @@ function DevPanel({ appState, saveState, setCurrentUser, currentUser }) {
           ))}
         </div>
       </div>
-
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <button onClick={() => { if (confirm("Seed test data?")) {
-          const testState = { ...appState,
-            users: { ...appState.users, testuser1: { displayName: "TestPlayer1", password: "test" }, testuser2: { displayName: "TestPlayer2", password: "test" } },
-          };
-          saveState(testState);
-        }}} style={devBtn}>Seed Test Users</button>
+        <button onClick={() => { if (confirm("Seed test data?")) { saveState({ ...appState, users: { ...appState.users, testuser1: { displayName: "TestPlayer1", password: "test" }, testuser2: { displayName: "TestPlayer2", password: "test" } } }); }}} style={devBtn}>Seed Test Users</button>
         <button onClick={() => setShowRaw(!showRaw)} style={devBtn}>{showRaw ? "Hide" : "Show"} Raw State</button>
         <button onClick={() => { if (confirm("NUKE EVERYTHING?")) saveState(DEFAULT_STATE); }} style={{ ...devBtn, color: "#F87171", borderColor: "rgba(248,113,113,0.4)" }}>Full Reset</button>
       </div>
-
-      {showRaw && (
-        <pre style={{ background: "rgba(0,0,0,0.3)", padding: 12, borderRadius: 8, fontSize: 11, color: "#A89070", overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-          {JSON.stringify(appState, null, 2)}
-        </pre>
-      )}
-
-      <p style={{ color: "rgba(74,222,128,0.5)", fontSize: 11, marginTop: 8 }}>
-        Registered: {Object.keys(appState.users||{}).length} users · {Object.keys(appState.teams||{}).length} teams · {(appState.episodes||[]).reduce((a,e) => a + (e.events||[]).length, 0)} events
-      </p>
+      {showRaw && (<pre style={{ background: "rgba(0,0,0,0.3)", padding: 12, borderRadius: 8, fontSize: 11, color: "#A89070", overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{JSON.stringify(appState, null, 2)}</pre>)}
+      <p style={{ color: "rgba(74,222,128,0.5)", fontSize: 11, marginTop: 8 }}>Registered: {Object.keys(appState.users||{}).length} users · {Object.keys(appState.teams||{}).length} teams · {(appState.episodes||[]).reduce((a,e) => a + (e.events||[]).length, 0)} events</p>
     </div>
   );
 }
@@ -107,7 +88,8 @@ function App() {
   const devMode = useDevMode();
   const [appState, setAppState] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
-  const [view, setView] = useState(localStorage.getItem("bc_user") ? "dashboard" : "login");
+  const [view, setView] = useState(localStorage.getItem("bc_user") ? "home" : "login");
+  const [commishTab, setCommishTab] = useState("scoring");
   const [loading, setLoading] = useState(true);
   const [loginName, setLoginName] = useState("");
   const [loginPass, setLoginPass] = useState("");
@@ -126,6 +108,7 @@ function App() {
   const [announcementDraft, setAnnouncementDraft] = useState("");
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [expandedCast, setExpandedCast] = useState(null);
+  const [expandedRecap, setExpandedRecap] = useState(null);
 
   // Restore saved session
   useEffect(() => {
@@ -133,17 +116,14 @@ function App() {
     if (saved) setCurrentUser(saved);
   }, []);
 
-  // Load initial state, then subscribe to real-time updates
+  // Load initial state + real-time sync
   useEffect(() => {
     let unsubscribe;
     async function init() {
       try {
         const initial = await loadState();
         setAppState(initial || DEFAULT_STATE);
-        // Real-time sync: when Vito enters scores, everyone sees it live
-        unsubscribe = subscribeToState((newState) => {
-          setAppState(newState);
-        });
+        unsubscribe = subscribeToState((newState) => { setAppState(newState); });
       } catch (err) {
         console.error("Firebase load error:", err);
         setAppState(DEFAULT_STATE);
@@ -169,11 +149,11 @@ function App() {
       const isFirst = Object.keys(appState.users).length === 0;
       const willBeCommish = isCommish && (appState.commissioners||[]).length === 0;
       await saveState({ ...appState, users: { ...appState.users, [name]: { displayName: loginName.trim(), password: loginPass } }, commissioners: willBeCommish || isFirst ? [...(appState.commissioners||[]), name] : (appState.commissioners||[]) });
-      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("dashboard");
+      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("home");
     } else {
       const user = appState.users[name];
       if (!user || user.password !== loginPass) { setError("Invalid name or password"); return; }
-      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("dashboard");
+      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("home");
     }
   };
 
@@ -230,13 +210,12 @@ function App() {
     );
   }
 
-  // Dev mode bypass: show login AND app
   if (view === "login" && devMode) {
     return (
       <div style={S.loginScreen}><style>{globalStyles}</style><FireParticles/>
         <div style={{...S.loginCard, maxWidth: 600}}>
           <div style={{textAlign:"center",marginBottom:16}}><TorchIcon size={48}/><h1 style={S.title}>FANTASY SURVIVOR</h1><p style={S.subtitle}>DEV MODE ACTIVE</p></div>
-          <DevPanel appState={appState} saveState={saveState} setCurrentUser={(u) => { setCurrentUser(u); setView("dashboard"); }} currentUser={currentUser} />
+          <DevPanel appState={appState} saveState={saveState} setCurrentUser={(u) => { setCurrentUser(u); setView("home"); }} currentUser={currentUser} />
           <hr style={{ border: "none", borderTop: "1px solid rgba(255,140,66,0.15)", margin: "16px 0" }} />
           <div style={S.tabRow}>
             <button onClick={()=>{setIsRegistering(false);setError("");}} style={{...S.tab,...(!isRegistering?S.tabActive:{})}}>Sign In</button>
@@ -257,6 +236,14 @@ function App() {
   const sortedTeams = Object.entries(teamScores).sort((a,b)=>b[1].total-a[1].total);
   const myTeam = getUserTeam(currentUser);
   const eliminated = appState.eliminated || [];
+  const postedRecaps = [...(appState.episodes||[])].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number);
+
+  // ── Commissioner sub-tabs ──
+  const commishTabs = [
+    { id: "scoring",  label: "Update Scoring" },
+    { id: "recaps",   label: "Episode Recaps" },
+    { id: "tools",    label: "Tools" },
+  ];
 
   return (
     <div style={S.appContainer}><style>{globalStyles}</style><FireParticles/>
@@ -266,14 +253,54 @@ function App() {
         <div style={S.headerRight}><span style={S.userName}>{appState.users[currentUser]?.displayName}</span>{isUserCommissioner&&<span style={S.commBadge}>COMMISH</span>}{devMode&&<span style={{...S.commBadge,background:"rgba(74,222,128,0.2)",color:"#4ADE80"}}>DEV</span>}<button style={S.logoutBtn} onClick={()=>{localStorage.removeItem("bc_user");setCurrentUser(null);setView("login");}}>Logout</button></div>
       </header>
       <nav style={S.nav}>
-        {["dashboard","leaderboard","castStatus","rules"].map(v=>(<button key={v} onClick={()=>setView(v)} style={{...S.navBtn,...(view===v?S.navBtnActive:{})}}>{v==="dashboard"?"Home":v==="leaderboard"?"Scoreboard":v==="castStatus"?"Cast":"Rules"}</button>))}
-        {(isUserCommissioner||devMode)&&<button onClick={()=>setView("scores")} style={{...S.navBtn,...(view==="scores"?S.navBtnActive:{}),color:"#FF6B35"}}>Update Scoring</button>}
-        {isUserCommissioner&&<button onClick={()=>setView("admin")} style={{...S.navBtn,...(view==="admin"?S.navBtnActive:{}),color:"#FF6B35"}}>Commissioner</button>}
+        {[
+          {id:"home",label:"Home"},
+          {id:"myteam",label:"My Team"},
+          {id:"leaderboard",label:"Scoreboard"},
+          {id:"castStatus",label:"Cast"},
+          {id:"rules",label:"Rules"},
+        ].map(({id,label})=>(<button key={id} onClick={()=>setView(id)} style={{...S.navBtn,...(view===id?S.navBtnActive:{})}}>{label}</button>))}
+        {(isUserCommissioner||devMode)&&<button onClick={()=>setView("admin")} style={{...S.navBtn,...(view==="admin"?S.navBtnActive:{}),color:"#FF6B35"}}>Commissioner</button>}
       </nav>
       <main style={S.main}>
         {devMode && <DevPanel appState={appState} saveState={saveState} setCurrentUser={setCurrentUser} currentUser={currentUser} />}
-        {/* DASHBOARD */}
-        {view==="dashboard"&&(<div>
+
+        {/* ── HOME ── */}
+        {view==="home"&&(<div>
+          {appState.announcement&&(<div style={{...S.card,borderColor:"rgba(255,217,61,0.2)",background:"rgba(255,217,61,0.05)",marginBottom:20}}>
+            <p style={{fontFamily:"'Cinzel',serif",fontSize:12,color:"#FFD93D",letterSpacing:2,marginBottom:6}}>📣 COMMISSIONER MESSAGE</p>
+            <p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.6}}>{appState.announcement}</p>
+          </div>)}
+          <div style={S.card}>
+            <h2 style={S.cardTitle}>Standings</h2>
+            {sortedTeams.length>0?sortedTeams.map(([name,data],i)=>(
+              <div key={name} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:8,marginBottom:6,background:myTeam&&myTeam[0]===name?"rgba(255,107,53,0.1)":"rgba(255,255,255,0.02)",borderLeft:i===0?"3px solid #FFD93D":i===1?"3px solid #C0C0C0":i===2?"3px solid #CD7F32":"3px solid transparent"}}>
+                <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:16,color:i===0?"#FFD93D":i===1?"#C0C0C0":i===2?"#CD7F32":"#A89070",width:28}}>#{i+1}</span>
+                {appState.teams[name]?.logo?<img src={appState.teams[name].logo} alt="logo" style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.25)"}}/>:<div style={{width:40,height:40,borderRadius:"50%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🔥</div>}
+                <div style={{flex:1}}>
+                  <p style={{color:"#E8D5B5",fontWeight:700,fontSize:16}}>{name}</p>
+                  <p style={{color:"#A89070",fontSize:13}}>{appState.users[data.owner]?.displayName}</p>
+                </div>
+                <span style={{fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:22,color:"#FF8C42"}}>{data.total}</span>
+              </div>
+            )):<p style={{color:"#A89070"}}>No teams yet.</p>}
+          </div>
+          {postedRecaps.length>0&&(<div style={S.card}>
+            <h2 style={S.cardTitle}>Episode Recaps</h2>
+            {postedRecaps.map(ep=>(
+              <div key={ep.number} style={{marginBottom:8,borderRadius:8,border:"1px solid rgba(255,140,66,0.1)",overflow:"hidden"}}>
+                <div onClick={()=>setExpandedRecap(expandedRecap===ep.number?null:ep.number)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"rgba(255,255,255,0.03)",cursor:"pointer"}}>
+                  <p style={{fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,color:"#FF8C42",letterSpacing:1}}>Episode {ep.number}</p>
+                  <span style={{color:"#A89070",fontSize:11,transform:expandedRecap===ep.number?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▼</span>
+                </div>
+                {expandedRecap===ep.number&&(<div style={{padding:"12px 16px",background:"rgba(42,26,10,0.4)",borderTop:"1px solid rgba(255,140,66,0.08)"}}><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.6}}>{ep.recap}</p></div>)}
+              </div>
+            ))}
+          </div>)}
+        </div>)}
+
+        {/* ── MY TEAM ── */}
+        {view==="myteam"&&(<div>
           {myTeam?(<div style={S.card}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
               <div style={{flex:1}}>
@@ -309,19 +336,18 @@ function App() {
             {teamScores[myTeam[0]]?.progression?.length>1&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><MiniChart data={teamScores[myTeam[0]].progression} width={280} height={50}/></div>}
             <div style={S.memberGrid}>{myTeam[1].members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const isE=eliminated.includes(m);return(<div key={m} style={{...S.memberCard,opacity:isE?0.5:1}}><Portrait slug={c?.slug} tribe={c?.tribe} size={40} eliminated={isE}/><div style={{flex:1}}><p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m}</p><p style={S.memberTribe}>{c?.tribe}{isE?" · Eliminated":""}</p></div><p style={S.memberScore}>{contestantScores[m]?.total||0}</p></div>);})}</div>
           </div>):(<div style={S.card}><h2 style={S.cardTitle}>No Team Yet</h2><p style={{color:"#A89070"}}>{isUserCommissioner?"Head to the Commissioner tab to set up teams.":"The commissioner hasn't set up your team yet."}</p></div>)}
-          <div style={S.card}><h2 style={S.cardTitle}>Standings</h2>
-            {sortedTeams.length>0?sortedTeams.map(([name,data],i)=>(<div key={name} style={{...S.standingRow,background:myTeam&&myTeam[0]===name?"rgba(255,107,53,0.1)":"transparent",borderLeft:i===0?"3px solid #FFD93D":"3px solid transparent"}}><span style={S.standingRank}>#{i+1}</span>{appState.teams[name]?.logo&&<img src={appState.teams[name].logo} alt="logo" style={{width:32,height:32,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.2)"}}/>}<div style={{flex:1}}><span style={S.standingName}>{name}</span>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div><span style={S.standingOwner}>{appState.users[data.owner]?.displayName}</span><span style={S.standingScore}>{data.total}</span></div>)):<p style={{color:"#A89070"}}>No teams set up yet.</p>}
-          </div>
-          {appState.episodes.filter(ep=>ep.recap).length>0&&(<div style={S.card}><h2 style={S.cardTitle}>Episode Recaps</h2>{[...appState.episodes].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number).slice(0,3).map(ep=>(<div key={ep.number} style={{marginBottom:16,padding:12,background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:"3px solid #FF8C42"}}><p style={S.epLabel}>Episode {ep.number}</p><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.5}}>{ep.recap}</p></div>))}</div>)}
-          {appState.episodes.length>0&&(<div style={S.card}><h2 style={S.cardTitle}>Latest Events</h2>{[...appState.episodes].sort((a,b)=>b.number-a.number).slice(0,3).map(ep=>(<div key={ep.number} style={{marginBottom:16}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={S.eventRow}><span style={{...S.eventContestant,textDecoration:eliminated.includes(ev.contestant)?"line-through":"none"}}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span></div>))}</div>))}</div>)}
         </div>)}
 
-        {/* LEADERBOARD */}
+        {/* ── SCOREBOARD ── */}
         {view==="leaderboard"&&(<div>
           <div style={S.card}><h2 style={S.cardTitle}>Scoreboard</h2>
             {sortedTeams.map(([name,data],i)=>(<div key={name} style={S.leaderboardCard} onClick={()=>setExpandedTeam(expandedTeam===name?null:name)}>
               <div style={S.leaderboardHeader}>
-                <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{...S.rankBadge,background:i===0?"linear-gradient(135deg,#FFD93D,#FF8C42)":i===1?"linear-gradient(135deg,#C0C0C0,#A0A0A0)":i===2?"linear-gradient(135deg,#CD7F32,#A0622E)":"#3D3020"}}>{i+1}</span>{appState.teams[name]?.logo&&<img src={appState.teams[name].logo} alt="logo" style={{width:44,height:44,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.3)"}}/>}<div><p style={S.lbTeamName}>{name}</p><p style={S.lbOwner}>{appState.users[data.owner]?.displayName}</p>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div></div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <span style={{...S.rankBadge,background:i===0?"linear-gradient(135deg,#FFD93D,#FF8C42)":i===1?"linear-gradient(135deg,#C0C0C0,#A0A0A0)":i===2?"linear-gradient(135deg,#CD7F32,#A0622E)":"#3D3020"}}>{i+1}</span>
+                  {appState.teams[name]?.logo&&<img src={appState.teams[name].logo} alt="logo" style={{width:44,height:44,borderRadius:"50%",objectFit:"cover",border:"2px solid rgba(255,140,66,0.3)"}}/>}
+                  <div><p style={S.lbTeamName}>{name}</p><p style={S.lbOwner}>{appState.users[data.owner]?.displayName}</p>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div>
+                </div>
                 <div style={{textAlign:"right"}}><p style={S.lbTotal}>{data.total}</p>{data.progression?.length>1&&<MiniChart data={data.progression} width={120} height={30}/>}</div>
               </div>
               {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=eliminated.includes(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:TRIBE_COLORS[c?.tribe]||"#666"}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
@@ -330,7 +356,7 @@ function App() {
           </div>
         </div>)}
 
-        {/* CAST */}
+        {/* ── CAST ── */}
         {view==="castStatus"&&(<div>
           <div style={S.card}>
             <h2 style={S.cardTitle}>All Contestants</h2>
@@ -368,12 +394,7 @@ function App() {
                           return Object.entries(byEp).sort((a,b)=>Number(b[0])-Number(a[0])).map(([ep,evts])=>(
                             <div key={ep} style={{marginBottom:12}}>
                               <p style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,color:"#FF8C42",marginBottom:4,letterSpacing:1}}>Episode {ep}</p>
-                              {evts.map((ev,j)=>(
-                                <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",marginBottom:2,borderRadius:4,background:"rgba(255,255,255,0.02)"}}>
-                                  <span style={{color:"#E8D5B5",fontSize:13}}>{ev.label}</span>
-                                  <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,color:ev.points>=0?"#4ADE80":"#F87171"}}>{ev.points>0?"+":""}{ev.points}</span>
-                                </div>
-                              ))}
+                              {evts.map((ev,j)=>(<div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",marginBottom:2,borderRadius:4,background:"rgba(255,255,255,0.02)"}}><span style={{color:"#E8D5B5",fontSize:13}}>{ev.label}</span><span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,color:ev.points>=0?"#4ADE80":"#F87171"}}>{ev.points>0?"+":""}{ev.points}</span></div>))}
                             </div>
                           ));
                         })():<p style={{color:"#A89070",fontSize:13,fontStyle:"italic"}}>No scoring events yet.</p>}
@@ -386,63 +407,106 @@ function App() {
           </div>
         </div>)}
 
-        {/* SCORES */}
-        {view==="scores"&&(isUserCommissioner||devMode)&&(<div>
-            <div style={S.card}>
-              <h2 style={S.cardTitle}>Update Scoring</h2>
-              <div style={S.formRow}>
-                <label style={S.formLabel}>Episode #</label>
-                <input type="number" min="1" max="20" value={eventForm.episode} onChange={e=>setEventForm({...eventForm,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/>
-              </div>
-              <div style={S.formRow}>
-                <label style={S.formLabel}>Scoring Event</label>
-                <select value={eventForm.event} onChange={e=>setEventForm({...eventForm,event:e.target.value})} style={S.select}>
-                  <option value="">Select event...</option>
-                  {Object.entries(SCORING_RULES).map(([k,r])=>(<option key={k} value={k}>{r.label} ({r.points>0?"+":""}{r.points})</option>))}
-                </select>
-              </div>
-              <div style={S.formRow}>
-                <label style={S.formLabel}>Contestants ({eventForm.contestants.length} selected — tap to select/deselect)</label>
-                <div style={S.contestantPicker}>
-                  {CONTESTANTS.filter(c=>!eliminated.includes(c.name)).map(c=>{
-                    const sel=eventForm.contestants.includes(c.name);
-                    return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)",fontWeight:sel?700:400}}>{c.name}</button>);
-                  })}
-                  {eliminated.length>0&&(<>
-                    <div style={{width:"100%",borderTop:"1px solid rgba(255,255,255,0.06)",margin:"6px 0"}}/>
-                    {CONTESTANTS.filter(c=>eliminated.includes(c.name)).map(c=>{
-                      const sel=eventForm.contestants.includes(c.name);
-                      return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?"rgba(248,113,113,0.3)":"rgba(255,255,255,0.03)",color:sel?"#F87171":"#555",borderColor:sel?"rgba(248,113,113,0.5)":"rgba(255,255,255,0.06)",textDecoration:"line-through"}}>☠ {c.name}</button>);
-                    })}
-                  </>)}
-                </div>
-              </div>
-              <button style={{...S.primaryBtn,opacity:!eventForm.contestants.length||!eventForm.event?0.4:1}} onClick={addEvent}>
-                Add {eventForm.contestants.length>1?`${eventForm.contestants.length} Events`:"Event"}
-              </button>
-            </div>
-            <div style={S.card}><h2 style={S.cardTitle}>Episode Recap</h2><div style={S.formRow}><label style={S.formLabel}>Episode #</label><input type="number" min="1" max="20" value={episodeRecap.episode} onChange={e=>setEpisodeRecap({...episodeRecap,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/></div><textarea style={{...S.input,minHeight:80,resize:"vertical"}} placeholder="What happened this episode..." value={episodeRecap.text} onChange={e=>setEpisodeRecap({...episodeRecap,text:e.target.value})}/><button style={S.primaryBtn} onClick={saveRecap}>Save Recap</button></div>
-            <div style={S.card}><h2 style={S.cardTitle}>Event Log</h2>{[...appState.episodes].sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:20}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={{...S.eventRow,alignItems:"center"}}><span style={S.eventContestant}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span><button onClick={()=>removeEvent(ep.number,i)} style={S.removeBtn}>✕</button></div>))}</div>))}{appState.episodes.length===0&&<p style={{color:"#A89070"}}>No events recorded yet.</p>}</div>
-        </div>)}
-
-        {/* RULES */}
+        {/* ── RULES ── */}
         {view==="rules"&&(<div style={S.card}><h2 style={S.cardTitle}>Scoring Rules</h2><div style={{display:"grid",gap:8}}>{Object.entries(SCORING_RULES).map(([k,r])=>(<div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:`3px solid ${r.points>=0?"#4ADE80":"#F87171"}`}}><span style={{color:"#E8D5B5"}}>{r.label}</span><span style={{fontWeight:700,fontSize:18,fontFamily:"'Cinzel',serif",color:r.points>=0?"#4ADE80":"#F87171"}}>{r.points>0?"+":""}{r.points}</span></div>))}</div></div>)}
 
-        {/* ADMIN */}
-        {view==="admin"&&(isUserCommissioner||devMode)&&(<div>
-          <div style={S.card}><h2 style={S.cardTitle}>League Announcement</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Shows as a banner at the top for all players.</p><input style={S.input} placeholder="e.g. Draft party Saturday at 7pm!" value={announcementDraft||appState.announcement} onChange={e=>setAnnouncementDraft(e.target.value)}/><div style={{display:"flex",gap:8}}><button style={{...S.primaryBtn,flex:1}} onClick={()=>saveState({...appState,announcement:announcementDraft})}>Update</button><button style={{...S.smallBtnGhost,padding:"12px 16px"}} onClick={()=>{saveState({...appState,announcement:""});setAnnouncementDraft("");}}>Clear</button></div></div>
-          <div style={S.card}><h2 style={S.cardTitle}>Commissioner Powers</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Grant or revoke commissioner access.</p>{Object.entries(appState.users).map(([key,u])=>{const isC=(appState.commissioners||[]).includes(key);return(<div key={key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{color:"#E8D5B5"}}>{u.displayName}</span>{isC&&<span style={S.commBadge}>COMMISH</span>}</div>{key!==currentUser&&<button style={isC?S.removeBtn:S.editBtn} onClick={()=>toggleCommissioner(key)}>{isC?"Revoke":"Grant"}</button>}</div>);})}</div>
-          <div style={S.card}><h2 style={S.cardTitle}>Elimination Tracker</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Mark contestants as eliminated.</p><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const isE=eliminated.includes(c.name);return(<button key={c.name} onClick={()=>toggleEliminated(c.name)} style={{...S.contestantChip,background:isE?"rgba(248,113,113,0.2)":"rgba(255,255,255,0.05)",color:isE?"#F87171":"#A89070",borderColor:isE?"rgba(248,113,113,0.4)":"rgba(255,255,255,0.1)",textDecoration:isE?"line-through":"none"}}>{isE&&"☠ "}{c.name}</button>);})}</div></div>
-          <div style={S.card}><h2 style={S.cardTitle}>Manage Teams</h2>
-            <div style={S.formRow}><label style={S.formLabel}>Team Name</label><input style={S.input} placeholder="e.g. Kaloboration" value={teamDraft.teamName} onChange={e=>setTeamDraft({...teamDraft,teamName:e.target.value})}/></div>
-            <div style={S.formRow}><label style={S.formLabel}>Team Owner</label><select value={teamDraft.editOwner||""} onChange={e=>setTeamDraft({...teamDraft,editOwner:e.target.value})} style={S.select}><option value="">Select owner...</option>{Object.entries(appState.users).map(([k,u])=>(<option key={k} value={k}>{u.displayName}</option>))}</select></div>
-            <div style={S.formRow}><label style={S.formLabel}>Contestants ({teamDraft.members.length} selected)</label><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const sel=teamDraft.members.includes(c.name);return(<button key={c.name} onClick={()=>setTeamDraft({...teamDraft,members:sel?teamDraft.members.filter(m=>m!==c.name):[...teamDraft.members,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)"}}>{c.name}</button>);})}</div></div>
-            <button style={S.primaryBtn} onClick={saveTeam}>Save Team</button>
+        {/* ── COMMISSIONER ── */}
+        {view==="admin"&&(isUserCommissioner||devMode)&&(<div style={{display:"flex",gap:20,alignItems:"flex-start"}}>
+
+          {/* Left sidebar — desktop */}
+          <div style={S.commishSidebar}>
+            {commishTabs.map(t=>(<button key={t.id} onClick={()=>setCommishTab(t.id)} style={{...S.commishSideBtn,...(commishTab===t.id?S.commishSideBtnActive:{})}}>{t.label}</button>))}
           </div>
-          <div style={S.card}><h2 style={S.cardTitle}>Current Teams</h2>{Object.entries(appState.teams||{}).map(([name,team])=>(<div key={name} style={S.existingTeam}><div style={{flex:1}}><p style={{color:"#E8D5B5",fontWeight:700,marginBottom:4}}>{name}</p><p style={{color:"#A89070",fontSize:13,marginBottom:2}}>Owner: {appState.users[team.owner]?.displayName}</p>{team.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginBottom:6}}>"{team.motto}"</p>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{team.members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);return(<span key={m} style={{fontSize:12,padding:"2px 8px",borderRadius:4,background:TRIBE_COLORS[c?.tribe]+"33",color:TRIBE_COLORS[c?.tribe],textDecoration:eliminated.includes(m)?"line-through":"none"}}>{m}</span>);})}</div></div><div style={{display:"flex",gap:8}}><button style={S.editBtn} onClick={()=>setTeamDraft({teamName:name,members:[...team.members],editOwner:team.owner,editKey:name})}>Edit</button><button style={S.removeBtn} onClick={()=>deleteTeam(name)}>Delete</button></div></div>))}{Object.keys(appState.teams||{}).length===0&&<p style={{color:"#A89070"}}>No teams created yet.</p>}</div>
-          <div style={S.card}><h2 style={S.cardTitle}>League Settings</h2><div style={S.formRow}><label style={S.formLabel}>League Name</label><input style={S.input} value={appState.leagueName} onChange={e=>saveState({...appState,leagueName:e.target.value})}/></div></div>
-          <div style={{...S.card,borderColor:"rgba(248,113,113,0.3)"}}><h2 style={{...S.cardTitle,color:"#F87171"}}>Danger Zone</h2><button style={{...S.removeBtn,padding:"8px 16px",fontSize:14}} onClick={async()=>{if(confirm("Reset ALL data? This cannot be undone.")){await saveState(DEFAULT_STATE);setCurrentUser(null);setView("login");}}}>Reset Entire League</button></div>
+
+          {/* Mobile tabs */}
+          <div style={S.commishMobileTabs}>
+            {commishTabs.map(t=>(<button key={t.id} onClick={()=>setCommishTab(t.id)} style={{...S.commishMobileTab,...(commishTab===t.id?S.commishMobileTabActive:{})}}>{t.label}</button>))}
+          </div>
+
+          {/* Content */}
+          <div style={{flex:1,minWidth:0}}>
+
+            {/* UPDATE SCORING */}
+            {commishTab==="scoring"&&(<div>
+              <div style={S.card}>
+                <h2 style={S.cardTitle}>Update Scoring</h2>
+                <div style={S.formRow}>
+                  <label style={S.formLabel}>Episode #</label>
+                  <input type="number" min="1" max="20" value={eventForm.episode} onChange={e=>setEventForm({...eventForm,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/>
+                </div>
+                <div style={S.formRow}>
+                  <label style={S.formLabel}>Scoring Event</label>
+                  <select value={eventForm.event} onChange={e=>setEventForm({...eventForm,event:e.target.value})} style={S.select}>
+                    <option value="">Select event...</option>
+                    {Object.entries(SCORING_RULES).map(([k,r])=>(<option key={k} value={k}>{r.label} ({r.points>0?"+":""}{r.points})</option>))}
+                  </select>
+                </div>
+                <div style={S.formRow}>
+                  <label style={S.formLabel}>Contestants ({eventForm.contestants.length} selected — tap to select/deselect)</label>
+                  <div style={S.contestantPicker}>
+                    {CONTESTANTS.filter(c=>!eliminated.includes(c.name)).map(c=>{
+                      const sel=eventForm.contestants.includes(c.name);
+                      return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)",fontWeight:sel?700:400}}>{c.name}</button>);
+                    })}
+                    {eliminated.length>0&&(<>
+                      <div style={{width:"100%",borderTop:"1px solid rgba(255,255,255,0.06)",margin:"6px 0"}}/>
+                      {CONTESTANTS.filter(c=>eliminated.includes(c.name)).map(c=>{
+                        const sel=eventForm.contestants.includes(c.name);
+                        return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?"rgba(248,113,113,0.3)":"rgba(255,255,255,0.03)",color:sel?"#F87171":"#555",borderColor:sel?"rgba(248,113,113,0.5)":"rgba(255,255,255,0.06)",textDecoration:"line-through"}}>☠ {c.name}</button>);
+                      })}
+                    </>)}
+                  </div>
+                </div>
+                <button style={{...S.primaryBtn,opacity:!eventForm.contestants.length||!eventForm.event?0.4:1}} onClick={addEvent}>
+                  Add {eventForm.contestants.length>1?`${eventForm.contestants.length} Events`:"Event"}
+                </button>
+              </div>
+              <div style={S.card}>
+                <h2 style={S.cardTitle}>Elimination Tracker</h2>
+                <p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Tap a contestant to toggle their elimination status.</p>
+                <div style={S.contestantPicker}>
+                  {CONTESTANTS.map(c=>{const isE=eliminated.includes(c.name);return(<button key={c.name} onClick={()=>toggleEliminated(c.name)} style={{...S.contestantChip,background:isE?"rgba(248,113,113,0.2)":"rgba(255,255,255,0.05)",color:isE?"#F87171":"#A89070",borderColor:isE?"rgba(248,113,113,0.4)":"rgba(255,255,255,0.1)",textDecoration:isE?"line-through":"none"}}>{isE&&"☠ "}{c.name}</button>);})}
+                </div>
+              </div>
+              <div style={S.card}><h2 style={S.cardTitle}>Event Log</h2>
+                {[...appState.episodes].sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:20}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={{...S.eventRow,alignItems:"center"}}><span style={S.eventContestant}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span><button onClick={()=>removeEvent(ep.number,i)} style={S.removeBtn}>✕</button></div>))}</div>))}
+                {appState.episodes.length===0&&<p style={{color:"#A89070"}}>No events recorded yet.</p>}
+              </div>
+            </div>)}
+
+            {/* EPISODE RECAPS */}
+            {commishTab==="recaps"&&(<div>
+              <div style={S.card}>
+                <h2 style={S.cardTitle}>Episode Recap</h2>
+                <p style={{color:"#A89070",fontSize:13,marginBottom:16}}>Recaps are visible to all players on the Home page once saved.</p>
+                <div style={S.formRow}><label style={S.formLabel}>Episode #</label><input type="number" min="1" max="20" value={episodeRecap.episode} onChange={e=>setEpisodeRecap({...episodeRecap,episode:parseInt(e.target.value)||1})} style={{...S.input,width:80}}/></div>
+                <textarea style={{...S.input,minHeight:120,resize:"vertical"}} placeholder="What happened this episode..." value={episodeRecap.text} onChange={e=>setEpisodeRecap({...episodeRecap,text:e.target.value})}/>
+                <button style={S.primaryBtn} onClick={saveRecap}>Save Recap</button>
+              </div>
+              {postedRecaps.length>0&&(<div style={S.card}>
+                <h2 style={S.cardTitle}>Posted Recaps</h2>
+                {postedRecaps.map(ep=>(<div key={ep.number} style={{marginBottom:16,padding:12,background:"rgba(255,255,255,0.03)",borderRadius:8,borderLeft:"3px solid #FF8C42"}}><p style={S.epLabel}>Episode {ep.number}</p><p style={{color:"#E8D5B5",fontSize:15,lineHeight:1.5}}>{ep.recap}</p></div>))}
+              </div>)}
+            </div>)}
+
+            {/* TOOLS */}
+            {commishTab==="tools"&&(<div>
+              <div style={S.card}><h2 style={S.cardTitle}>League Announcement</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Shows as a banner at the top for all players, and on the Home page.</p><input style={S.input} placeholder="e.g. Draft party Saturday at 7pm!" value={announcementDraft||appState.announcement} onChange={e=>setAnnouncementDraft(e.target.value)}/><div style={{display:"flex",gap:8}}><button style={{...S.primaryBtn,flex:1}} onClick={()=>saveState({...appState,announcement:announcementDraft})}>Update</button><button style={{...S.smallBtnGhost,padding:"12px 16px"}} onClick={()=>{saveState({...appState,announcement:""});setAnnouncementDraft("");}}>Clear</button></div></div>
+              <div style={S.card}><h2 style={S.cardTitle}>Manage Teams</h2>
+                <div style={S.formRow}><label style={S.formLabel}>Team Name</label><input style={S.input} placeholder="e.g. Kaloboration" value={teamDraft.teamName} onChange={e=>setTeamDraft({...teamDraft,teamName:e.target.value})}/></div>
+                <div style={S.formRow}><label style={S.formLabel}>Team Owner</label><select value={teamDraft.editOwner||""} onChange={e=>setTeamDraft({...teamDraft,editOwner:e.target.value})} style={S.select}><option value="">Select owner...</option>{Object.entries(appState.users).map(([k,u])=>(<option key={k} value={k}>{u.displayName}</option>))}</select></div>
+                <div style={S.formRow}><label style={S.formLabel}>Contestants ({teamDraft.members.length} selected)</label><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const sel=teamDraft.members.includes(c.name);return(<button key={c.name} onClick={()=>setTeamDraft({...teamDraft,members:sel?teamDraft.members.filter(m=>m!==c.name):[...teamDraft.members,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)"}}>{c.name}</button>);})}</div></div>
+                <button style={S.primaryBtn} onClick={saveTeam}>Save Team</button>
+              </div>
+              <div style={S.card}><h2 style={S.cardTitle}>Current Teams</h2>{Object.entries(appState.teams||{}).map(([name,team])=>(<div key={name} style={S.existingTeam}><div style={{flex:1}}><p style={{color:"#E8D5B5",fontWeight:700,marginBottom:4}}>{name}</p><p style={{color:"#A89070",fontSize:13,marginBottom:2}}>Owner: {appState.users[team.owner]?.displayName}</p>{team.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginBottom:6}}>"{team.motto}"</p>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{team.members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);return(<span key={m} style={{fontSize:12,padding:"2px 8px",borderRadius:4,background:TRIBE_COLORS[c?.tribe]+"33",color:TRIBE_COLORS[c?.tribe],textDecoration:eliminated.includes(m)?"line-through":"none"}}>{m}</span>);})}</div></div><div style={{display:"flex",gap:8}}><button style={S.editBtn} onClick={()=>setTeamDraft({teamName:name,members:[...team.members],editOwner:team.owner,editKey:name})}>Edit</button><button style={S.removeBtn} onClick={()=>deleteTeam(name)}>Delete</button></div></div>))}{Object.keys(appState.teams||{}).length===0&&<p style={{color:"#A89070"}}>No teams created yet.</p>}</div>
+              <div style={S.card}><h2 style={S.cardTitle}>Commissioner Powers</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Grant or revoke commissioner access.</p>{Object.entries(appState.users).map(([key,u])=>{const isC=(appState.commissioners||[]).includes(key);return(<div key={key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{color:"#E8D5B5"}}>{u.displayName}</span>{isC&&<span style={S.commBadge}>COMMISH</span>}</div>{key!==currentUser&&<button style={isC?S.removeBtn:S.editBtn} onClick={()=>toggleCommissioner(key)}>{isC?"Revoke":"Grant"}</button>}</div>);})}</div>
+              <div style={S.card}><h2 style={S.cardTitle}>League Settings</h2><div style={S.formRow}><label style={S.formLabel}>League Name</label><input style={S.input} value={appState.leagueName} onChange={e=>saveState({...appState,leagueName:e.target.value})}/></div></div>
+              <div style={{...S.card,borderColor:"rgba(248,113,113,0.3)"}}><h2 style={{...S.cardTitle,color:"#F87171"}}>Danger Zone</h2><button style={{...S.removeBtn,padding:"8px 16px",fontSize:14}} onClick={async()=>{if(confirm("Reset ALL data? This cannot be undone.")){await saveState(DEFAULT_STATE);setCurrentUser(null);setView("login");}}}>Reset Entire League</button></div>
+            </div>)}
+
+          </div>
         </div>)}
+
       </main>
     </div>
   );
@@ -456,6 +520,8 @@ const globalStyles = `
   input:focus,select:focus,textarea:focus{outline:none;border-color:#FF8C42;box-shadow:0 0 0 2px rgba(255,140,66,0.2)}
   ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#1A0F05}::-webkit-scrollbar-thumb{background:#3D3020;border-radius:3px}
   select option{background:#2A1A0A;color:#E8D5B5}textarea{font-family:'Crimson Pro',serif}
+  .commish-sidebar{display:flex;flex-direction:column;gap:4px;min-width:160px}
+  @media(max-width:600px){.commish-sidebar{display:none!important}.commish-mobile-tabs{display:flex!important}}
 `;
 
 const S = {
@@ -478,40 +544,58 @@ const S = {
   announcementBanner:{background:"linear-gradient(90deg,rgba(255,107,53,0.15),rgba(255,140,66,0.08))",borderBottom:"1px solid rgba(255,140,66,0.2)",padding:"10px 24px",color:"#FFD93D",fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:600,letterSpacing:0.5,textAlign:"center",position:"relative",zIndex:10},
   appContainer:{minHeight:"100vh",background:"linear-gradient(180deg,#1A0F05 0%,#2A1508 30%,#1A0F05 100%)",position:"relative"},
   header:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 24px",borderBottom:"1px solid rgba(255,140,66,0.15)",background:"rgba(26,15,5,0.95)",backdropFilter:"blur(10px)",position:"sticky",top:0,zIndex:10,flexWrap:"wrap",gap:8},
-  headerLeft:{display:"flex",alignItems:"center",gap:12},headerTitle:{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:"#FFD93D",letterSpacing:1},
-  headerSub:{fontSize:11,color:"#A89070",letterSpacing:2,fontFamily:"'Cinzel',serif"},headerRight:{display:"flex",alignItems:"center",gap:12},
-  userName:{color:"#E8D5B5",fontWeight:500},commBadge:{fontSize:10,padding:"2px 8px",borderRadius:4,background:"rgba(255,107,53,0.2)",color:"#FF8C42",fontFamily:"'Cinzel',serif",fontWeight:700,letterSpacing:1},
+  headerLeft:{display:"flex",alignItems:"center",gap:12},
+  headerTitle:{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:"#FFD93D",letterSpacing:1},
+  headerSub:{fontSize:11,color:"#A89070",letterSpacing:2,fontFamily:"'Cinzel',serif"},
+  headerRight:{display:"flex",alignItems:"center",gap:12},
+  userName:{color:"#E8D5B5",fontWeight:500},
+  commBadge:{fontSize:10,padding:"2px 8px",borderRadius:4,background:"rgba(255,107,53,0.2)",color:"#FF8C42",fontFamily:"'Cinzel',serif",fontWeight:700,letterSpacing:1},
   logoutBtn:{padding:"6px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#A89070",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
   nav:{display:"flex",gap:4,padding:"8px 24px",borderBottom:"1px solid rgba(255,140,66,0.08)",background:"rgba(26,15,5,0.8)",overflowX:"auto",flexWrap:"wrap"},
   navBtn:{padding:"8px 16px",background:"transparent",border:"none",borderRadius:6,color:"#A89070",fontFamily:"'Cinzel',serif",fontSize:13,cursor:"pointer",whiteSpace:"nowrap"},
   navBtnActive:{background:"rgba(255,140,66,0.12)",color:"#FF8C42"},
-  main:{maxWidth:800,margin:"0 auto",padding:"24px 16px",position:"relative",zIndex:1},
+  main:{maxWidth:900,margin:"0 auto",padding:"24px 16px",position:"relative",zIndex:1},
   card:{background:"rgba(42,26,10,0.6)",border:"1px solid rgba(255,140,66,0.12)",borderRadius:12,padding:24,marginBottom:20,backdropFilter:"blur(10px)"},
   cardTitle:{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:"#FFD93D",marginBottom:16,letterSpacing:1},
   teamTotal:{fontSize:48,fontWeight:900,fontFamily:"'Cinzel',serif",color:"#FF8C42",textAlign:"center",margin:"12px 0 16px",textShadow:"0 2px 30px rgba(255,140,66,0.3)"},
-  memberGrid:{display:"grid",gap:10},memberCard:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"rgba(255,255,255,0.03)",borderRadius:8},
-  tribeDot:{width:10,height:10,borderRadius:"50%",flexShrink:0},memberName:{color:"#E8D5B5",fontWeight:600,fontSize:15},memberTribe:{color:"#A89070",fontSize:13},
+  memberGrid:{display:"grid",gap:10},
+  memberCard:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"rgba(255,255,255,0.03)",borderRadius:8},
+  tribeDot:{width:10,height:10,borderRadius:"50%",flexShrink:0},
+  memberName:{color:"#E8D5B5",fontWeight:600,fontSize:15},
+  memberTribe:{color:"#A89070",fontSize:13},
   memberScore:{marginLeft:"auto",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:"#FF8C42"},
   standingRow:{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",borderRadius:6,marginBottom:4},
-  standingRank:{fontFamily:"'Cinzel',serif",fontWeight:700,color:"#A89070",width:30},standingName:{fontWeight:600,color:"#E8D5B5"},
-  standingOwner:{color:"#A89070",fontSize:13,minWidth:60,textAlign:"right"},standingScore:{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:18,color:"#FF8C42",minWidth:40,textAlign:"right"},
+  standingRank:{fontFamily:"'Cinzel',serif",fontWeight:700,color:"#A89070",width:30},
+  standingName:{fontWeight:600,color:"#E8D5B5"},
+  standingOwner:{color:"#A89070",fontSize:13,minWidth:60,textAlign:"right"},
+  standingScore:{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:18,color:"#FF8C42",minWidth:40,textAlign:"right"},
   leaderboardCard:{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:16,marginBottom:12,cursor:"pointer"},
   leaderboardHeader:{display:"flex",justifyContent:"space-between",alignItems:"center"},
   rankBadge:{width:32,height:32,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:14,color:"#1A0F05"},
-  lbTeamName:{fontFamily:"'Cinzel',serif",fontWeight:700,color:"#E8D5B5",fontSize:16},lbOwner:{color:"#A89070",fontSize:13},
+  lbTeamName:{fontFamily:"'Cinzel',serif",fontWeight:700,color:"#E8D5B5",fontSize:16},
+  lbOwner:{color:"#A89070",fontSize:13},
   lbTotal:{fontFamily:"'Cinzel',serif",fontSize:28,fontWeight:900,color:"#FFD93D"},
   lbMembers:{display:"grid",gap:6,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:12,marginTop:12},
   lbMemberRow:{display:"flex",alignItems:"center",gap:8,padding:"4px 0"},
   epLabel:{fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,color:"#FF8C42",marginBottom:8,letterSpacing:1},
   eventRow:{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",borderRadius:6,marginBottom:4,background:"rgba(255,255,255,0.02)"},
-  eventContestant:{flex:1,color:"#E8D5B5",fontWeight:500,fontSize:14},eventLabel:{color:"#A89070",fontSize:13},
+  eventContestant:{flex:1,color:"#E8D5B5",fontWeight:500,fontSize:14},
+  eventLabel:{color:"#A89070",fontSize:13},
   eventPoints:{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:14,minWidth:32,textAlign:"right"},
-  formRow:{marginBottom:16},formLabel:{display:"block",fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:600,color:"#A89070",marginBottom:6,letterSpacing:1,textTransform:"uppercase"},
+  formRow:{marginBottom:16},
+  formLabel:{display:"block",fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:600,color:"#A89070",marginBottom:6,letterSpacing:1,textTransform:"uppercase"},
   contestantPicker:{display:"flex",flexWrap:"wrap",gap:6},
   contestantChip:{padding:"6px 12px",borderRadius:20,border:"1px solid",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
   existingTeam:{display:"flex",alignItems:"center",gap:12,padding:16,background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:8,flexWrap:"wrap"},
   editBtn:{padding:"6px 14px",background:"rgba(255,140,66,0.15)",border:"1px solid rgba(255,140,66,0.3)",borderRadius:6,color:"#FF8C42",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
   removeBtn:{padding:"4px 10px",background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:6,color:"#F87171",fontSize:13,cursor:"pointer",fontFamily:"'Crimson Pro',serif"},
+  // Commissioner sidebar
+  commishSidebar:{display:"flex",flexDirection:"column",gap:4,minWidth:160,position:"sticky",top:80},
+  commishSideBtn:{padding:"12px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,color:"#A89070",fontFamily:"'Cinzel',serif",fontSize:13,cursor:"pointer",textAlign:"left",transition:"all 0.15s"},
+  commishSideBtnActive:{background:"rgba(255,107,53,0.12)",border:"1px solid rgba(255,107,53,0.3)",color:"#FF8C42"},
+  commishMobileTabs:{display:"none",gap:4,marginBottom:16,flexWrap:"wrap"},
+  commishMobileTab:{flex:1,padding:"10px 8px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,color:"#A89070",fontFamily:"'Cinzel',serif",fontSize:12,cursor:"pointer",textAlign:"center",minWidth:90},
+  commishMobileTabActive:{background:"rgba(255,107,53,0.12)",border:"1px solid rgba(255,107,53,0.3)",color:"#FF8C42"},
 };
 
 export default App;
