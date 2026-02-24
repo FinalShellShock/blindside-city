@@ -19,31 +19,36 @@ export const SCORING_RULES = {
 };
 
 export const CONTESTANTS = [
-  { name: "Rick Devens", tribe: "Cila", season: "38" },
-  { name: "Cirie Fields", tribe: "Cila", season: "12,16,20,34" },
-  { name: "Emily Flippen", tribe: "Cila", season: "45" },
-  { name: "Christian Hubicki", tribe: "Cila", season: "37" },
-  { name: "Joe Hunter", tribe: "Cila", season: "48" },
-  { name: "Jenna Lewis", tribe: "Cila", season: "1,8" },
-  { name: "Savannah Louie", tribe: "Cila", season: "49" },
-  { name: "Ozzy Lusth", tribe: "Cila", season: "13,16,23,34" },
-  { name: "Charlie Davis", tribe: "Kalo", season: "46" },
-  { name: "Tiffany Ervin", tribe: "Kalo", season: "46" },
-  { name: "Chrissy Hofbeck", tribe: "Kalo", season: "35" },
-  { name: "Kamilla Karthigesu", tribe: "Kalo", season: "48" },
-  { name: "Dee Valladares", tribe: "Kalo", season: "45" },
-  { name: 'Benjamin "Coach" Wade', tribe: "Kalo", season: "18,20,23" },
-  { name: "Mike White", tribe: "Kalo", season: "37" },
-  { name: "Jonathan Young", tribe: "Kalo", season: "42" },
-  { name: "Aubry Bracco", tribe: "Vatu", season: "32,34,38" },
-  { name: "Q Burdette", tribe: "Vatu", season: "46" },
-  { name: "Colby Donaldson", tribe: "Vatu", season: "2,8,20" },
-  { name: "Kyle Fraser", tribe: "Vatu", season: "48" },
-  { name: "Angelina Keeley", tribe: "Vatu", season: "37" },
-  { name: "Stephenie LaGrossa", tribe: "Vatu", season: "10,11,20" },
-  { name: "Genevieve Mushaluk", tribe: "Vatu", season: "47" },
-  { name: "Rizo Velovic", tribe: "Vatu", season: "49" },
+  { name: "Rick Devens", tribe: "Cila", season: "38", slug: "rick-devens" },
+  { name: "Cirie Fields", tribe: "Cila", season: "12,16,20,34", slug: "cirie-fields" },
+  { name: "Emily Flippen", tribe: "Cila", season: "45", slug: "emily-flippen" },
+  { name: "Christian Hubicki", tribe: "Cila", season: "37", slug: "christian-hubicki" },
+  { name: "Joe Hunter", tribe: "Cila", season: "48", slug: "joe-hunter" },
+  { name: "Jenna Lewis", tribe: "Cila", season: "1,8", slug: "jenna-lewis" },
+  { name: "Savannah Louie", tribe: "Cila", season: "49", slug: "savannah-louie" },
+  { name: "Ozzy Lusth", tribe: "Cila", season: "13,16,23,34", slug: "ozzy-lusth" },
+  { name: "Charlie Davis", tribe: "Kalo", season: "46", slug: "charlie-davis" },
+  { name: "Tiffany Ervin", tribe: "Kalo", season: "46", slug: "tiffany-ervin" },
+  { name: "Chrissy Hofbeck", tribe: "Kalo", season: "35", slug: "chrissy-hofbeck" },
+  { name: "Kamilla Karthigesu", tribe: "Kalo", season: "48", slug: "kamilla-karthigesu" },
+  { name: "Dee Valladares", tribe: "Kalo", season: "45", slug: "dee-valladares" },
+  { name: 'Benjamin "Coach" Wade', tribe: "Kalo", season: "18,20,23", slug: "coach-wade" },
+  { name: "Mike White", tribe: "Kalo", season: "37", slug: "mike-white" },
+  { name: "Jonathan Young", tribe: "Kalo", season: "42", slug: "jonathan-young" },
+  { name: "Aubry Bracco", tribe: "Vatu", season: "32,34,38", slug: "aubry-bracco" },
+  { name: "Q Burdette", tribe: "Vatu", season: "46", slug: "q-burdette" },
+  { name: "Colby Donaldson", tribe: "Vatu", season: "2,8,20", slug: "colby-donaldson" },
+  { name: "Kyle Fraser", tribe: "Vatu", season: "48", slug: "kyle-fraser" },
+  { name: "Angelina Keeley", tribe: "Vatu", season: "37", slug: "angelina-keeley" },
+  { name: "Stephenie LaGrossa", tribe: "Vatu", season: "10,11,20", slug: "stephenie-lagrossa" },
+  { name: "Genevieve Mushaluk", tribe: "Vatu", season: "47", slug: "genevieve-mushaluk" },
+  { name: "Rizo Velovic", tribe: "Vatu", season: "49", slug: "rizo-velovic" },
 ];
+
+// Portrait helper — returns path if image exists, null for fallback
+export function getPortraitUrl(slug) {
+  return `/portraits/${slug}.jpg`;
+}
 
 export const TRIBE_COLORS = { Cila: "#E85D26", Kalo: "#2BA8A0", Vatu: "#C4267A" };
 

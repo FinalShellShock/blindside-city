@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
-import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE } from "./gameData.js";
+import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, getPortraitUrl } from "./gameData.js";
 
 // ── Dev mode: access via ?dev=torchsnuffer ──
 const DEV_PASSWORD = "torchsnuffer";
@@ -11,6 +11,28 @@ function useDevMode() {
     if (params.get("dev") === DEV_PASSWORD) setActive(true);
   }, []);
   return active;
+}
+
+// ── Portrait with fallback ──
+function Portrait({ slug, tribe, size = 36, eliminated = false }) {
+  const [failed, setFailed] = useState(false);
+  if (failed || !slug) {
+    // Fallback: colored circle with first initial
+    const initial = (slug || "?").charAt(0).toUpperCase();
+    return (
+      <div style={{ width: size, height: size, borderRadius: "50%", background: TRIBE_COLORS[tribe] || "#3D3020", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: size * 0.4, flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${TRIBE_COLORS[tribe] || "#3D3020"}` }}>
+        {initial}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={getPortraitUrl(slug)}
+      alt={slug}
+      onError={() => setFailed(true)}
+      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${TRIBE_COLORS[tribe] || "#3D3020"}`, filter: eliminated ? "grayscale(100%)" : "none" }}
+    />
+  );
 }
 
 // ── Small components ──
@@ -88,6 +110,7 @@ function App() {
   const [episodeRecap, setEpisodeRecap] = useState({ episode: 1, text: "" });
   const [announcementDraft, setAnnouncementDraft] = useState("");
   const [expandedTeam, setExpandedTeam] = useState(null);
+  const [expandedCast, setExpandedCast] = useState(null);
 
   // Load initial state, then subscribe to real-time updates
   useEffect(() => {
@@ -237,7 +260,7 @@ function App() {
             </div>
             <p style={S.teamTotal}>{teamScores[myTeam[0]]?.total||0} <span style={{fontSize:16,opacity:0.6}}>pts</span></p>
             {teamScores[myTeam[0]]?.progression?.length>1&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><MiniChart data={teamScores[myTeam[0]].progression} width={280} height={50}/></div>}
-            <div style={S.memberGrid}>{myTeam[1].members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const isE=eliminated.includes(m);return(<div key={m} style={{...S.memberCard,opacity:isE?0.5:1}}><div style={{...S.tribeDot,background:TRIBE_COLORS[c?.tribe]||"#666"}}/><div style={{flex:1}}><p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m}</p><p style={S.memberTribe}>{c?.tribe}{isE?" · Eliminated":""}</p></div><p style={S.memberScore}>{contestantScores[m]?.total||0}</p></div>);})}</div>
+            <div style={S.memberGrid}>{myTeam[1].members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const isE=eliminated.includes(m);return(<div key={m} style={{...S.memberCard,opacity:isE?0.5:1}}><Portrait slug={c?.slug} tribe={c?.tribe} size={40} eliminated={isE}/><div style={{flex:1}}><p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m}</p><p style={S.memberTribe}>{c?.tribe}{isE?" · Eliminated":""}</p></div><p style={S.memberScore}>{contestantScores[m]?.total||0}</p></div>);})}</div>
           </div>):(<div style={S.card}><h2 style={S.cardTitle}>No Team Yet</h2><p style={{color:"#A89070"}}>{isUserCommissioner?"Head to the Commissioner tab to set up teams.":"The commissioner hasn't set up your team yet."}</p></div>)}
           <div style={S.card}><h2 style={S.cardTitle}>Standings</h2>
             {sortedTeams.length>0?sortedTeams.map(([name,data],i)=>(<div key={name} style={{...S.standingRow,background:myTeam&&myTeam[0]===name?"rgba(255,107,53,0.1)":"transparent",borderLeft:i===0?"3px solid #FFD93D":"3px solid transparent"}}><span style={S.standingRank}>#{i+1}</span><div style={{flex:1}}><span style={S.standingName}>{name}</span>{appState.teams[name]?.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginTop:2}}>{appState.teams[name].motto}</p>}</div><span style={S.standingOwner}>{appState.users[data.owner]?.displayName}</span><span style={S.standingScore}>{data.total}</span></div>)):<p style={{color:"#A89070"}}>No teams set up yet.</p>}
@@ -265,7 +288,60 @@ function App() {
         </div>)}
 
         {/* CAST */}
-        {view==="castStatus"&&(<div>{["Cila","Kalo","Vatu"].map(tribe=>(<div key={tribe} style={{...S.card,borderLeft:`3px solid ${TRIBE_COLORS[tribe]}`}}><h2 style={{...S.cardTitle,color:TRIBE_COLORS[tribe]}}>{tribe} Tribe</h2>{CONTESTANTS.filter(c=>c.tribe===tribe).map(c=>{const isE=eliminated.includes(c.name);const owner=Object.entries(appState.teams||{}).find(([_,t])=>t.members.includes(c.name));return(<div key={c.name} style={{...S.eventRow,opacity:isE?0.45:1}}>{isE?<SkullIcon size={14}/>:<div style={{...S.tribeDot,background:TRIBE_COLORS[tribe]}}/>}<div style={{flex:1}}><span style={{color:"#E8D5B5",fontWeight:500,textDecoration:isE?"line-through":"none"}}>{c.name}</span><span style={{color:"#A89070",fontSize:12,marginLeft:8}}>S{c.season}</span></div>{owner&&<span style={{fontSize:12,color:"#A89070",padding:"2px 8px",background:"rgba(255,255,255,0.05)",borderRadius:4}}>{owner[0]}</span>}<span style={{color:"#FF8C42",fontWeight:600,minWidth:30,textAlign:"right"}}>{contestantScores[c.name]?.total||0}</span></div>);})}</div>))}</div>)}
+        {view==="castStatus"&&(<div>
+          <div style={S.card}>
+            <h2 style={S.cardTitle}>All Contestants</h2>
+            <p style={{color:"#A89070",fontSize:13,marginBottom:16}}>Sorted by points · tap a player to see their scoring breakdown</p>
+            <div style={{display:"grid",gap:6}}>
+              {[...CONTESTANTS].sort((a,b)=>(contestantScores[b.name]?.total||0)-(contestantScores[a.name]?.total||0)).map((c,i)=>{
+                const isE=eliminated.includes(c.name);
+                const owner=Object.entries(appState.teams||{}).find(([_,t])=>t.members.includes(c.name));
+                const score=contestantScores[c.name]?.total||0;
+                const events=contestantScores[c.name]?.events||[];
+                const isExpanded=expandedCast===c.name;
+                return(
+                  <div key={c.name}>
+                    <div onClick={()=>setExpandedCast(isExpanded?null:c.name)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:isExpanded?"rgba(255,140,66,0.08)":"rgba(255,255,255,0.02)",cursor:"pointer",borderLeft:`3px solid ${TRIBE_COLORS[c.tribe]}`,opacity:isE?0.55:1,transition:"background 0.15s"}}>
+                      <span style={{color:"#A89070",fontFamily:"'Cinzel',serif",fontWeight:600,width:26,fontSize:13,textAlign:"center"}}>{i+1}</span>
+                      <Portrait slug={c.slug} tribe={c.tribe} size={36} eliminated={isE}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <span style={{color:"#E8D5B5",fontWeight:600,fontSize:15,textDecoration:isE?"line-through":"none"}}>{c.name}</span>
+                          {isE&&<SkullIcon size={12}/>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
+                          <span style={{fontSize:11,padding:"1px 6px",borderRadius:3,background:TRIBE_COLORS[c.tribe]+"22",color:TRIBE_COLORS[c.tribe],fontWeight:600}}>{c.tribe}</span>
+                          {owner&&<span style={{fontSize:11,color:"#A89070"}}>· {owner[0]}</span>}
+                        </div>
+                      </div>
+                      <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:20,color:score>0?"#FF8C42":"#A89070",minWidth:40,textAlign:"right"}}>{score}</span>
+                      <span style={{color:"#A89070",fontSize:11,transform:isExpanded?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▼</span>
+                    </div>
+                    {isExpanded&&(
+                      <div style={{marginLeft:29,padding:"12px 16px",background:"rgba(42,26,10,0.4)",borderRadius:"0 0 8px 8px",borderLeft:`3px solid ${TRIBE_COLORS[c.tribe]}`}}>
+                        {events.length>0?(()=>{
+                          const byEp={};
+                          events.forEach(ev=>{if(!byEp[ev.episode])byEp[ev.episode]=[];byEp[ev.episode].push(ev);});
+                          return Object.entries(byEp).sort((a,b)=>Number(b[0])-Number(a[0])).map(([ep,evts])=>(
+                            <div key={ep} style={{marginBottom:12}}>
+                              <p style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,color:"#FF8C42",marginBottom:4,letterSpacing:1}}>Episode {ep}</p>
+                              {evts.map((ev,j)=>(
+                                <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",marginBottom:2,borderRadius:4,background:"rgba(255,255,255,0.02)"}}>
+                                  <span style={{color:"#E8D5B5",fontSize:13}}>{ev.label}</span>
+                                  <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,color:ev.points>=0?"#4ADE80":"#F87171"}}>{ev.points>0?"+":""}{ev.points}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ));
+                        })():<p style={{color:"#A89070",fontSize:13,fontStyle:"italic"}}>No scoring events yet.</p>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>)}
 
         {/* SCORES */}
         {view==="scores"&&(<div>
