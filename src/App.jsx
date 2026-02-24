@@ -71,8 +71,10 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
 }
 
 // ── Reaction Bar ──
-// Desktop: hover pill = show names, click = react
-// Mobile:  short tap = react, hold 400ms = show names (appears above, not under thumb)
+// Desktop: hover pill = show names inline to the right, click = react
+// Mobile:  short tap = react, hold 400ms = show names inline to the right
+// "Inline to the right" means names appear as text on the same line after the pills —
+// no floating, no clipping, no layout shift, thumb doesn't cover it.
 function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [activeEmoji, setActiveEmoji] = useState(null);
@@ -92,89 +94,87 @@ function ReactionBar({ reactions = {}, onReact, currentUser, users = {} }) {
   };
 
   const endHold = (emoji, e) => {
-    e.preventDefault(); // prevent ghost click
+    e.preventDefault();
     clearTimeout(holdTimer.current);
     if (!didHold.current) {
-      // Short tap: react/unreact, dismiss names
       onReact(emoji);
       setPickerOpen(false);
       setActiveEmoji(null);
     }
-    // Long press already handled names in the timer callback
   };
 
+  const nameText = activeEmoji && (reactions[activeEmoji] || []).length > 0
+    ? getNames(reactions[activeEmoji]) : null;
+
   return (
-    <div style={{ marginTop: 6 }}>
-      {/* Fixed-height name label — always reserves space so pills never shift on hover */}
-      <div style={{ minHeight: 16, marginBottom: 2, paddingLeft: 2 }}>
-        {activeEmoji && (reactions[activeEmoji] || []).length > 0 && (
-          <span style={{
-            fontSize: 11, color: "#A89070",
-            fontFamily: "'Crimson Pro',serif", fontStyle: "italic",
+    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      {activeEmojis.map(emoji => {
+        const userKeys = reactions[emoji] || [];
+        const reacted = userKeys.includes(currentUser);
+        const count = userKeys.length;
+        return (
+          <button
+            key={emoji}
+            onClick={() => { onReact(emoji); setPickerOpen(false); setActiveEmoji(null); }}
+            onMouseEnter={() => setActiveEmoji(emoji)}
+            onMouseLeave={() => setActiveEmoji(null)}
+            onTouchStart={() => startHold(emoji)}
+            onTouchEnd={e => endHold(emoji, e)}
+            onTouchCancel={() => clearTimeout(holdTimer.current)}
+            style={{
+              padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
+              background: reacted ? "rgba(255,140,66,0.2)" : "rgba(255,255,255,0.04)",
+              border: reacted ? "1px solid rgba(255,140,66,0.5)" : "1px solid rgba(255,255,255,0.08)",
+              color: reacted ? "#FF8C42" : "#A89070",
+              display: "flex", alignItems: "center", gap: 4, transition: "all 0.12s",
+              WebkitUserSelect: "none", userSelect: "none", flexShrink: 0,
+            }}>
+            {emoji}<span style={{ fontSize: 12, fontWeight: 600 }}>{count}</span>
+          </button>
+        );
+      })}
+      {/* + button */}
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <button onClick={() => { setPickerOpen(o => !o); setActiveEmoji(null); }} style={{
+          padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
+          background: pickerOpen ? "rgba(255,140,66,0.12)" : "transparent",
+          border: pickerOpen ? "1px solid rgba(255,140,66,0.3)" : "1px dashed rgba(255,255,255,0.15)",
+          color: "#A89070", display: "flex", alignItems: "center", gap: 2, transition: "all 0.12s",
+          lineHeight: 1, WebkitUserSelect: "none", userSelect: "none",
+        }}>
+          <span style={{ fontSize: 15, fontWeight: 300 }}>+</span>
+        </button>
+        {pickerOpen && (
+          <div style={{
+            position: "absolute", bottom: "calc(100% + 6px)", left: 0,
+            display: "flex", gap: 4, padding: "6px 8px", borderRadius: 12,
+            background: "rgba(42,26,10,0.97)", border: "1px solid rgba(255,140,66,0.2)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.5)", zIndex: 50, whiteSpace: "nowrap",
           }}>
-            {activeEmoji} {getNames(reactions[activeEmoji])}
-          </span>
+            {REACTION_EMOJIS.map(emoji => (
+              <button key={emoji} onClick={() => { onReact(emoji); setPickerOpen(false); }} style={{
+                background: "transparent", border: "none", fontSize: 20, cursor: "pointer",
+                padding: "2px 4px", borderRadius: 6, transition: "transform 0.1s", lineHeight: 1,
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.3)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         )}
       </div>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-        {activeEmojis.map(emoji => {
-          const userKeys = reactions[emoji] || [];
-          const reacted = userKeys.includes(currentUser);
-          const count = userKeys.length;
-          return (
-            <button
-              key={emoji}
-              onClick={() => { onReact(emoji); setPickerOpen(false); setActiveEmoji(null); }}
-              onMouseEnter={() => setActiveEmoji(emoji)}
-              onMouseLeave={() => setActiveEmoji(null)}
-              onTouchStart={() => startHold(emoji)}
-              onTouchEnd={e => endHold(emoji, e)}
-              onTouchCancel={() => clearTimeout(holdTimer.current)}
-              style={{
-                padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
-                background: reacted ? "rgba(255,140,66,0.2)" : "rgba(255,255,255,0.04)",
-                border: reacted ? "1px solid rgba(255,140,66,0.5)" : "1px solid rgba(255,255,255,0.08)",
-                color: reacted ? "#FF8C42" : "#A89070",
-                display: "flex", alignItems: "center", gap: 4, transition: "all 0.12s",
-                WebkitUserSelect: "none", userSelect: "none",
-              }}>
-              {emoji}<span style={{ fontSize: 12, fontWeight: 600 }}>{count}</span>
-            </button>
-          );
-        })}
-        {/* + button */}
-        <div style={{ position: "relative" }}>
-          <button onClick={() => { setPickerOpen(o => !o); setActiveEmoji(null); }} style={{
-            padding: "2px 8px", borderRadius: 12, fontSize: 13, cursor: "pointer",
-            background: pickerOpen ? "rgba(255,140,66,0.12)" : "transparent",
-            border: pickerOpen ? "1px solid rgba(255,140,66,0.3)" : "1px dashed rgba(255,255,255,0.15)",
-            color: "#A89070", display: "flex", alignItems: "center", gap: 2, transition: "all 0.12s",
-            lineHeight: 1, WebkitUserSelect: "none", userSelect: "none",
-          }}>
-            <span style={{ fontSize: 15, fontWeight: 300 }}>+</span>
-          </button>
-          {pickerOpen && (
-            <div style={{
-              position: "absolute", bottom: "calc(100% + 6px)", left: 0,
-              display: "flex", gap: 4, padding: "6px 8px", borderRadius: 12,
-              background: "rgba(42,26,10,0.97)", border: "1px solid rgba(255,140,66,0.2)",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.5)", zIndex: 50, whiteSpace: "nowrap",
-            }}>
-              {REACTION_EMOJIS.map(emoji => (
-                <button key={emoji} onClick={() => { onReact(emoji); setPickerOpen(false); }} style={{
-                  background: "transparent", border: "none", fontSize: 20, cursor: "pointer",
-                  padding: "2px 4px", borderRadius: 6, transition: "transform 0.1s", lineHeight: 1,
-                }}
-                onMouseEnter={e => e.currentTarget.style.transform = "scale(1.3)"}
-                onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Names appear inline to the right of the pills — no float, no clip, no shift */}
+      {nameText && (
+        <span style={{
+          fontSize: 11, color: "#A89070", fontFamily: "'Crimson Pro',serif",
+          fontStyle: "italic", whiteSpace: "nowrap", overflow: "hidden",
+          textOverflow: "ellipsis", maxWidth: 200,
+        }}>
+          {nameText}
+        </span>
+      )}
     </div>
   );
 }
