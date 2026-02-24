@@ -15,6 +15,18 @@ const STOCK_LOGOS = [
   { id: "shark",    label: "Shark",    url: "/logos/logo-shark.jpg" },
 ];
 
+// All possible tribe labels (starting tribes + Merged + any custom)
+const STARTING_TRIBES = Object.keys(TRIBE_COLORS);
+const ALL_TRIBE_OPTIONS = [...STARTING_TRIBES, "Merged"];
+// Color for merged tribe
+const MERGED_COLOR = "#FFD93D";
+
+// Returns effective tribe color (merged or original)
+function tribeColor(tribe) {
+  if (tribe === "Merged") return MERGED_COLOR;
+  return TRIBE_COLORS[tribe] || "#666";
+}
+
 // ── Dev mode: access via ?dev=torchsnuffer ──
 const DEV_PASSWORD = "torchsnuffer";
 function useDevMode() {
@@ -32,14 +44,14 @@ function Portrait({ slug, tribe, size = 36, eliminated = false }) {
   if (failed || !slug) {
     const initial = (slug || "?").charAt(0).toUpperCase();
     return (
-      <div style={{ width: size, height: size, borderRadius: "50%", background: TRIBE_COLORS[tribe] || "#3D3020", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: size * 0.4, flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${TRIBE_COLORS[tribe] || "#3D3020"}` }}>
+      <div style={{ width: size, height: size, borderRadius: "50%", background: tribeColor(tribe), display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: size * 0.4, flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${tribeColor(tribe)}` }}>
         {initial}
       </div>
     );
   }
   return (
     <img src={getPortraitUrl(slug)} alt={slug} onError={() => setFailed(true)}
-      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${TRIBE_COLORS[tribe] || "#3D3020"}`, filter: eliminated ? "grayscale(100%)" : "none" }}
+      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, opacity: eliminated ? 0.4 : 1, border: `2px solid ${tribeColor(tribe)}`, filter: eliminated ? "grayscale(100%)" : "none" }}
     />
   );
 }
@@ -109,6 +121,7 @@ function App() {
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [expandedCast, setExpandedCast] = useState(null);
   const [expandedRecap, setExpandedRecap] = useState(null);
+  const [expandedMember, setExpandedMember] = useState(null);
 
   // Restore saved session
   useEffect(() => {
@@ -160,6 +173,12 @@ function App() {
   const isUserCommissioner = currentUser && (appState?.commissioners||[]).includes(currentUser);
   const getUserTeam = (u) => Object.entries(appState?.teams||{}).find(([_,t])=>t.owner===u);
 
+  // Returns effective (current) tribe for a contestant — checks tribeOverrides first
+  const getEffectiveTribe = (name) => {
+    const overrides = appState?.tribeOverrides || {};
+    return overrides[name] || CONTESTANTS.find(c => c.name === name)?.tribe || "Unknown";
+  };
+
   const getContestantScores = () => {
     const s = {}; CONTESTANTS.forEach(c => { s[c.name] = { total:0, events:[], byEpisode:{} }; });
     (appState?.episodes||[]).forEach(ep => { (ep.events||[]).forEach(ev => { const r = SCORING_RULES[ev.type]; if(r&&s[ev.contestant]){ s[ev.contestant].total+=r.points; s[ev.contestant].events.push({episode:ep.number,type:ev.type,label:r.label,points:r.points}); s[ev.contestant].byEpisode[ep.number]=(s[ev.contestant].byEpisode[ep.number]||0)+r.points; }}); });
@@ -186,6 +205,18 @@ function App() {
   const renameTeam = async (old) => { if(!newTeamName.trim()||newTeamName===old){setEditingTeamName(null);return;} const teams={...appState.teams}; teams[newTeamName]={...teams[old]}; delete teams[old]; await saveState({...appState,teams}); setEditingTeamName(null); setNewTeamName(""); };
   const saveMotto = async (tn) => { const teams={...appState.teams}; if(teams[tn])teams[tn].motto=newMotto; await saveState({...appState,teams}); setEditingMotto(null); setNewMotto(""); };
   const saveLogo = async (tn, url) => { const teams={...appState.teams}; if(teams[tn])teams[tn].logo=url; await saveState({...appState,teams}); setEditingLogo(null); setCustomLogoUrl(""); };
+
+  // Update a contestant's current tribe
+  const setContestantTribe = async (contestantName, newTribe) => {
+    const overrides = { ...(appState.tribeOverrides || {}) };
+    const original = CONTESTANTS.find(c => c.name === contestantName)?.tribe;
+    if (newTribe === original) {
+      delete overrides[contestantName]; // back to original, no need to store
+    } else {
+      overrides[contestantName] = newTribe;
+    }
+    await saveState({ ...appState, tribeOverrides: overrides });
+  };
 
   if (loading) return (<div style={S.loadingScreen}><style>{globalStyles}</style><TorchIcon size={64}/><p style={{color:"#FF8C42",fontFamily:"'Cinzel',serif",marginTop:16,fontSize:18}}>Loading...</p></div>);
 
@@ -236,12 +267,14 @@ function App() {
   const sortedTeams = Object.entries(teamScores).sort((a,b)=>b[1].total-a[1].total);
   const myTeam = getUserTeam(currentUser);
   const eliminated = appState.eliminated || [];
+  const tribeOverrides = appState.tribeOverrides || {};
   const postedRecaps = [...(appState.episodes||[])].filter(ep=>ep.recap).sort((a,b)=>b.number-a.number);
 
   // ── Commissioner sub-tabs ──
   const commishTabs = [
     { id: "scoring",  label: "Update Scoring" },
     { id: "recaps",   label: "Episode Recaps" },
+    { id: "cast",     label: "Cast & Tribes" },
     { id: "tools",    label: "Tools" },
   ];
 
@@ -334,7 +367,70 @@ function App() {
             )}
             <p style={S.teamTotal}>{teamScores[myTeam[0]]?.total||0} <span style={{fontSize:16,opacity:0.6}}>pts</span></p>
             {teamScores[myTeam[0]]?.progression?.length>1&&<div style={{display:"flex",justifyContent:"center",marginBottom:16}}><MiniChart data={teamScores[myTeam[0]].progression} width={280} height={50}/></div>}
-            <div style={S.memberGrid}>{myTeam[1].members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const isE=eliminated.includes(m);return(<div key={m} style={{...S.memberCard,opacity:isE?0.5:1}}><Portrait slug={c?.slug} tribe={c?.tribe} size={40} eliminated={isE}/><div style={{flex:1}}><p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m}</p><p style={S.memberTribe}>{c?.tribe}{isE?" · Eliminated":""}</p></div><p style={S.memberScore}>{contestantScores[m]?.total||0}</p></div>);})}</div>
+
+            {/* Member cards with expandable event breakdown */}
+            <div style={S.memberGrid}>
+              {myTeam[1].members.map(m=>{
+                const c = CONTESTANTS.find(x=>x.name===m);
+                const isE = eliminated.includes(m);
+                const currentTribe = getEffectiveTribe(m);
+                const originalTribe = c?.tribe;
+                const tribeChanged = tribeOverrides[m] && tribeOverrides[m] !== originalTribe;
+                const memberEvents = contestantScores[m]?.events || [];
+                const isExpanded = expandedMember === m;
+                // Group events by episode
+                const byEp = {};
+                memberEvents.forEach(ev => { if(!byEp[ev.episode]) byEp[ev.episode]=[]; byEp[ev.episode].push(ev); });
+
+                return (
+                  <div key={m} style={{borderRadius:8,overflow:"hidden",border:"1px solid rgba(255,255,255,0.05)"}}>
+                    {/* Main row — click to expand */}
+                    <div onClick={()=>setExpandedMember(isExpanded?null:m)} style={{...S.memberCard,cursor:"pointer",background:isExpanded?"rgba(255,140,66,0.07)":"rgba(255,255,255,0.03)",opacity:isE?0.6:1}}>
+                      <Portrait slug={c?.slug} tribe={currentTribe} size={40} eliminated={isE}/>
+                      <div style={{flex:1}}>
+                        <p style={{...S.memberName,textDecoration:isE?"line-through":"none"}}>{m} {isE&&<SkullIcon size={12}/>}</p>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:2}}>
+                          {/* Current tribe badge */}
+                          <span style={{fontSize:11,padding:"1px 7px",borderRadius:3,background:tribeColor(currentTribe)+"33",color:tribeColor(currentTribe),fontWeight:700}}>{currentTribe}</span>
+                          {/* Show original tribe if swapped */}
+                          {tribeChanged&&<span style={{fontSize:11,color:"#A89070",textDecoration:"line-through"}}>{originalTribe}</span>}
+                          {isE&&<span style={{fontSize:11,color:"#F87171"}}>· Eliminated</span>}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <p style={S.memberScore}>{contestantScores[m]?.total||0}</p>
+                        <span style={{color:"#A89070",fontSize:11,transform:isExpanded?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▼</span>
+                      </div>
+                    </div>
+
+                    {/* Expanded event breakdown */}
+                    {isExpanded&&(
+                      <div style={{padding:"12px 16px",background:"rgba(42,26,10,0.5)",borderTop:"1px solid rgba(255,140,66,0.08)"}}>
+                        {memberEvents.length>0?(
+                          Object.entries(byEp).sort((a,b)=>Number(b[0])-Number(a[0])).map(([ep,evts])=>(
+                            <div key={ep} style={{marginBottom:10}}>
+                              <p style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:"#FF8C42",marginBottom:4,letterSpacing:1}}>EPISODE {ep}</p>
+                              {evts.map((ev,j)=>(
+                                <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",marginBottom:2,borderRadius:4,background:"rgba(255,255,255,0.02)"}}>
+                                  <span style={{color:"#E8D5B5",fontSize:13}}>{ev.label}</span>
+                                  <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:13,color:ev.points>=0?"#4ADE80":"#F87171"}}>{ev.points>0?"+":""}{ev.points}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ))
+                        ):<p style={{color:"#A89070",fontSize:13,fontStyle:"italic"}}>No scoring events yet.</p>}
+                        {memberEvents.length>0&&(
+                          <div style={{display:"flex",justifyContent:"flex-end",paddingTop:6,borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:4}}>
+                            <span style={{color:"#A89070",fontSize:12,marginRight:8}}>Total</span>
+                            <span style={{fontFamily:"'Cinzel',serif",fontWeight:700,fontSize:14,color:"#FF8C42"}}>{contestantScores[m]?.total||0} pts</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>):(<div style={S.card}><h2 style={S.cardTitle}>No Team Yet</h2><p style={{color:"#A89070"}}>{isUserCommissioner?"Head to the Commissioner tab to set up teams.":"The commissioner hasn't set up your team yet."}</p></div>)}
         </div>)}
 
@@ -350,7 +446,7 @@ function App() {
                 </div>
                 <div style={{textAlign:"right"}}><p style={S.lbTotal}>{data.total}</p>{data.progression?.length>1&&<MiniChart data={data.progression} width={120} height={30}/>}</div>
               </div>
-              {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=eliminated.includes(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:TRIBE_COLORS[c?.tribe]||"#666"}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
+              {expandedTeam===name&&(<div style={S.lbMembers}>{Object.entries(data.memberScores).sort((a,b)=>b[1]-a[1]).map(([member,score])=>{const c=CONTESTANTS.find(x=>x.name===member);const isE=eliminated.includes(member);const curTribe=getEffectiveTribe(member);return(<div key={member} style={S.lbMemberRow}><div style={{...S.tribeDot,background:tribeColor(curTribe)}}/><span style={{flex:1,color:"#E8D5B5",textDecoration:isE?"line-through":"none",opacity:isE?0.5:1}}>{member} {isE&&<SkullIcon size={12}/>}</span><span style={{color:"#FF8C42",fontWeight:600}}>{score}</span></div>);})}</div>)}
             </div>))}
             {sortedTeams.length===0&&<p style={{color:"#A89070"}}>No teams yet.</p>}
           </div>
@@ -368,18 +464,21 @@ function App() {
                 const score=contestantScores[c.name]?.total||0;
                 const events=contestantScores[c.name]?.events||[];
                 const isExpanded=expandedCast===c.name;
+                const currentTribe = getEffectiveTribe(c.name);
+                const tribeChanged = tribeOverrides[c.name] && tribeOverrides[c.name] !== c.tribe;
                 return(
                   <div key={c.name}>
-                    <div onClick={()=>setExpandedCast(isExpanded?null:c.name)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:isExpanded?"rgba(255,140,66,0.08)":"rgba(255,255,255,0.02)",cursor:"pointer",borderLeft:`3px solid ${TRIBE_COLORS[c.tribe]}`,opacity:isE?0.55:1,transition:"background 0.15s"}}>
+                    <div onClick={()=>setExpandedCast(isExpanded?null:c.name)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:isExpanded?"rgba(255,140,66,0.08)":"rgba(255,255,255,0.02)",cursor:"pointer",borderLeft:`3px solid ${tribeColor(currentTribe)}`,opacity:isE?0.55:1,transition:"background 0.15s"}}>
                       <span style={{color:"#A89070",fontFamily:"'Cinzel',serif",fontWeight:600,width:26,fontSize:13,textAlign:"center"}}>{i+1}</span>
-                      <Portrait slug={c.slug} tribe={c.tribe} size={36} eliminated={isE}/>
+                      <Portrait slug={c.slug} tribe={currentTribe} size={36} eliminated={isE}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                           <span style={{color:"#E8D5B5",fontWeight:600,fontSize:15,textDecoration:isE?"line-through":"none"}}>{c.name}</span>
                           {isE&&<SkullIcon size={12}/>}
                         </div>
                         <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
-                          <span style={{fontSize:11,padding:"1px 6px",borderRadius:3,background:TRIBE_COLORS[c.tribe]+"22",color:TRIBE_COLORS[c.tribe],fontWeight:600}}>{c.tribe}</span>
+                          <span style={{fontSize:11,padding:"1px 6px",borderRadius:3,background:tribeColor(currentTribe)+"22",color:tribeColor(currentTribe),fontWeight:600}}>{currentTribe}</span>
+                          {tribeChanged&&<span style={{fontSize:11,color:"#A89070",textDecoration:"line-through"}}>{c.tribe}</span>}
                           {owner&&<span style={{fontSize:11,color:"#A89070"}}>· {owner[0]}</span>}
                         </div>
                       </div>
@@ -387,7 +486,7 @@ function App() {
                       <span style={{color:"#A89070",fontSize:11,transform:isExpanded?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▼</span>
                     </div>
                     {isExpanded&&(
-                      <div style={{marginLeft:29,padding:"12px 16px",background:"rgba(42,26,10,0.4)",borderRadius:"0 0 8px 8px",borderLeft:`3px solid ${TRIBE_COLORS[c.tribe]}`}}>
+                      <div style={{marginLeft:29,padding:"12px 16px",background:"rgba(42,26,10,0.4)",borderRadius:"0 0 8px 8px",borderLeft:`3px solid ${tribeColor(currentTribe)}`}}>
                         {events.length>0?(()=>{
                           const byEp={};
                           events.forEach(ev=>{if(!byEp[ev.episode])byEp[ev.episode]=[];byEp[ev.episode].push(ev);});
@@ -414,12 +513,12 @@ function App() {
         {view==="admin"&&(isUserCommissioner||devMode)&&(<div style={{display:"flex",gap:20,alignItems:"flex-start"}}>
 
           {/* Left sidebar — desktop */}
-          <div style={S.commishSidebar}>
+          <div className="commish-sidebar" style={S.commishSidebar}>
             {commishTabs.map(t=>(<button key={t.id} onClick={()=>setCommishTab(t.id)} style={{...S.commishSideBtn,...(commishTab===t.id?S.commishSideBtnActive:{})}}>{t.label}</button>))}
           </div>
 
           {/* Mobile tabs */}
-          <div style={S.commishMobileTabs}>
+          <div className="commish-mobile-tabs" style={S.commishMobileTabs}>
             {commishTabs.map(t=>(<button key={t.id} onClick={()=>setCommishTab(t.id)} style={{...S.commishMobileTab,...(commishTab===t.id?S.commishMobileTabActive:{})}}>{t.label}</button>))}
           </div>
 
@@ -446,7 +545,7 @@ function App() {
                   <div style={S.contestantPicker}>
                     {CONTESTANTS.filter(c=>!eliminated.includes(c.name)).map(c=>{
                       const sel=eventForm.contestants.includes(c.name);
-                      return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)",fontWeight:sel?700:400}}>{c.name}</button>);
+                      return(<button key={c.name} onClick={()=>setEventForm({...eventForm,contestants:sel?eventForm.contestants.filter(x=>x!==c.name):[...eventForm.contestants,c.name]})} style={{...S.contestantChip,background:sel?tribeColor(getEffectiveTribe(c.name)):"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?tribeColor(getEffectiveTribe(c.name)):"rgba(255,255,255,0.1)",fontWeight:sel?700:400}}>{c.name}</button>);
                     })}
                     {eliminated.length>0&&(<>
                       <div style={{width:"100%",borderTop:"1px solid rgba(255,255,255,0.06)",margin:"6px 0"}}/>
@@ -460,13 +559,6 @@ function App() {
                 <button style={{...S.primaryBtn,opacity:!eventForm.contestants.length||!eventForm.event?0.4:1}} onClick={addEvent}>
                   Add {eventForm.contestants.length>1?`${eventForm.contestants.length} Events`:"Event"}
                 </button>
-              </div>
-              <div style={S.card}>
-                <h2 style={S.cardTitle}>Elimination Tracker</h2>
-                <p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Tap a contestant to toggle their elimination status.</p>
-                <div style={S.contestantPicker}>
-                  {CONTESTANTS.map(c=>{const isE=eliminated.includes(c.name);return(<button key={c.name} onClick={()=>toggleEliminated(c.name)} style={{...S.contestantChip,background:isE?"rgba(248,113,113,0.2)":"rgba(255,255,255,0.05)",color:isE?"#F87171":"#A89070",borderColor:isE?"rgba(248,113,113,0.4)":"rgba(255,255,255,0.1)",textDecoration:isE?"line-through":"none"}}>{isE&&"☠ "}{c.name}</button>);})}
-                </div>
               </div>
               <div style={S.card}><h2 style={S.cardTitle}>Event Log</h2>
                 {[...appState.episodes].sort((a,b)=>b.number-a.number).map(ep=>(<div key={ep.number} style={{marginBottom:20}}><p style={S.epLabel}>Episode {ep.number}</p>{ep.events.map((ev,i)=>(<div key={i} style={{...S.eventRow,alignItems:"center"}}><span style={S.eventContestant}>{ev.contestant}</span><span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span><span style={{...S.eventPoints,color:SCORING_RULES[ev.type]?.points>=0?"#4ADE80":"#F87171"}}>{SCORING_RULES[ev.type]?.points>0?"+":""}{SCORING_RULES[ev.type]?.points}</span><button onClick={()=>removeEvent(ep.number,i)} style={S.removeBtn}>✕</button></div>))}</div>))}
@@ -489,16 +581,82 @@ function App() {
               </div>)}
             </div>)}
 
+            {/* CAST & TRIBES */}
+            {commishTab==="cast"&&(<div>
+              {/* Elimination Tracker */}
+              <div style={S.card}>
+                <h2 style={S.cardTitle}>Elimination Tracker</h2>
+                <p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Tap a contestant to toggle their elimination status.</p>
+                <div style={S.contestantPicker}>
+                  {CONTESTANTS.map(c=>{
+                    const isE=eliminated.includes(c.name);
+                    const curTribe=getEffectiveTribe(c.name);
+                    return(
+                      <button key={c.name} onClick={()=>toggleEliminated(c.name)} style={{...S.contestantChip,background:isE?"rgba(248,113,113,0.2)":tribeColor(curTribe)+"22",color:isE?"#F87171":tribeColor(curTribe),borderColor:isE?"rgba(248,113,113,0.4)":tribeColor(curTribe)+"66",textDecoration:isE?"line-through":"none"}}>
+                        {isE&&"☠ "}{c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tribe Tracker */}
+              <div style={S.card}>
+                <h2 style={S.cardTitle}>Tribe Tracker</h2>
+                <p style={{color:"#A89070",fontSize:13,marginBottom:4}}>Use this after tribe swaps or the merge. Original tribe shown in brackets.</p>
+                <p style={{color:"#A89070",fontSize:12,marginBottom:16,fontStyle:"italic"}}>Changes update tribe colors throughout the entire app.</p>
+
+                {/* Group by current tribe for display */}
+                {ALL_TRIBE_OPTIONS.map(tribeLabel=>{
+                  const membersInTribe = CONTESTANTS.filter(c=>getEffectiveTribe(c.name)===tribeLabel);
+                  if(membersInTribe.length===0) return null;
+                  return(
+                    <div key={tribeLabel} style={{marginBottom:20}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                        <div style={{width:12,height:12,borderRadius:"50%",background:tribeColor(tribeLabel)}}/>
+                        <p style={{fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,color:tribeColor(tribeLabel),letterSpacing:1}}>{tribeLabel.toUpperCase()}</p>
+                        <span style={{color:"#A89070",fontSize:12}}>({membersInTribe.length})</span>
+                      </div>
+                      <div style={{display:"grid",gap:6}}>
+                        {membersInTribe.map(c=>{
+                          const isE=eliminated.includes(c.name);
+                          const originalTribe=c.tribe;
+                          const swapped=tribeOverrides[c.name]&&tribeOverrides[c.name]!==originalTribe;
+                          return(
+                            <div key={c.name} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"rgba(255,255,255,0.03)",opacity:isE?0.5:1}}>
+                              <Portrait slug={c.slug} tribe={tribeLabel} size={32} eliminated={isE}/>
+                              <div style={{flex:1}}>
+                                <span style={{color:"#E8D5B5",fontWeight:600,textDecoration:isE?"line-through":"none"}}>{c.name}</span>
+                                {swapped&&<span style={{color:"#A89070",fontSize:12,marginLeft:6}}>[was {originalTribe}]</span>}
+                              </div>
+                              {/* Tribe reassignment buttons */}
+                              <div style={{display:"flex",gap:4,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                                {ALL_TRIBE_OPTIONS.map(t=>(
+                                  <button key={t} onClick={()=>setContestantTribe(c.name,t)} style={{padding:"3px 8px",borderRadius:4,fontSize:11,cursor:"pointer",fontFamily:"'Cinzel',serif",fontWeight:600,border:`1px solid ${tribeColor(t)}55`,background:getEffectiveTribe(c.name)===t?tribeColor(t)+"33":"transparent",color:getEffectiveTribe(c.name)===t?tribeColor(t):"#A89070",transition:"all 0.12s"}}>
+                                    {t}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>)}
+
             {/* TOOLS */}
             {commishTab==="tools"&&(<div>
               <div style={S.card}><h2 style={S.cardTitle}>League Announcement</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Shows as a banner at the top for all players, and on the Home page.</p><input style={S.input} placeholder="e.g. Draft party Saturday at 7pm!" value={announcementDraft||appState.announcement} onChange={e=>setAnnouncementDraft(e.target.value)}/><div style={{display:"flex",gap:8}}><button style={{...S.primaryBtn,flex:1}} onClick={()=>saveState({...appState,announcement:announcementDraft})}>Update</button><button style={{...S.smallBtnGhost,padding:"12px 16px"}} onClick={()=>{saveState({...appState,announcement:""});setAnnouncementDraft("");}}>Clear</button></div></div>
               <div style={S.card}><h2 style={S.cardTitle}>Manage Teams</h2>
                 <div style={S.formRow}><label style={S.formLabel}>Team Name</label><input style={S.input} placeholder="e.g. Kaloboration" value={teamDraft.teamName} onChange={e=>setTeamDraft({...teamDraft,teamName:e.target.value})}/></div>
                 <div style={S.formRow}><label style={S.formLabel}>Team Owner</label><select value={teamDraft.editOwner||""} onChange={e=>setTeamDraft({...teamDraft,editOwner:e.target.value})} style={S.select}><option value="">Select owner...</option>{Object.entries(appState.users).map(([k,u])=>(<option key={k} value={k}>{u.displayName}</option>))}</select></div>
-                <div style={S.formRow}><label style={S.formLabel}>Contestants ({teamDraft.members.length} selected)</label><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const sel=teamDraft.members.includes(c.name);return(<button key={c.name} onClick={()=>setTeamDraft({...teamDraft,members:sel?teamDraft.members.filter(m=>m!==c.name):[...teamDraft.members,c.name]})} style={{...S.contestantChip,background:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?TRIBE_COLORS[c.tribe]:"rgba(255,255,255,0.1)"}}>{c.name}</button>);})}</div></div>
+                <div style={S.formRow}><label style={S.formLabel}>Contestants ({teamDraft.members.length} selected)</label><div style={S.contestantPicker}>{CONTESTANTS.map(c=>{const sel=teamDraft.members.includes(c.name);const curTribe=getEffectiveTribe(c.name);return(<button key={c.name} onClick={()=>setTeamDraft({...teamDraft,members:sel?teamDraft.members.filter(m=>m!==c.name):[...teamDraft.members,c.name]})} style={{...S.contestantChip,background:sel?tribeColor(curTribe):"rgba(255,255,255,0.05)",color:sel?"#fff":"#A89070",borderColor:sel?tribeColor(curTribe):"rgba(255,255,255,0.1)"}}>{c.name}</button>);})}</div></div>
                 <button style={S.primaryBtn} onClick={saveTeam}>Save Team</button>
               </div>
-              <div style={S.card}><h2 style={S.cardTitle}>Current Teams</h2>{Object.entries(appState.teams||{}).map(([name,team])=>(<div key={name} style={S.existingTeam}><div style={{flex:1}}><p style={{color:"#E8D5B5",fontWeight:700,marginBottom:4}}>{name}</p><p style={{color:"#A89070",fontSize:13,marginBottom:2}}>Owner: {appState.users[team.owner]?.displayName}</p>{team.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginBottom:6}}>"{team.motto}"</p>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{team.members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);return(<span key={m} style={{fontSize:12,padding:"2px 8px",borderRadius:4,background:TRIBE_COLORS[c?.tribe]+"33",color:TRIBE_COLORS[c?.tribe],textDecoration:eliminated.includes(m)?"line-through":"none"}}>{m}</span>);})}</div></div><div style={{display:"flex",gap:8}}><button style={S.editBtn} onClick={()=>setTeamDraft({teamName:name,members:[...team.members],editOwner:team.owner,editKey:name})}>Edit</button><button style={S.removeBtn} onClick={()=>deleteTeam(name)}>Delete</button></div></div>))}{Object.keys(appState.teams||{}).length===0&&<p style={{color:"#A89070"}}>No teams created yet.</p>}</div>
+              <div style={S.card}><h2 style={S.cardTitle}>Current Teams</h2>{Object.entries(appState.teams||{}).map(([name,team])=>(<div key={name} style={S.existingTeam}><div style={{flex:1}}><p style={{color:"#E8D5B5",fontWeight:700,marginBottom:4}}>{name}</p><p style={{color:"#A89070",fontSize:13,marginBottom:2}}>Owner: {appState.users[team.owner]?.displayName}</p>{team.motto&&<p style={{color:"#A89070",fontSize:12,fontStyle:"italic",marginBottom:6}}>"{team.motto}"</p>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{team.members.map(m=>{const c=CONTESTANTS.find(x=>x.name===m);const curTribe=getEffectiveTribe(m);return(<span key={m} style={{fontSize:12,padding:"2px 8px",borderRadius:4,background:tribeColor(curTribe)+"33",color:tribeColor(curTribe),textDecoration:eliminated.includes(m)?"line-through":"none"}}>{m}</span>);})}</div></div><div style={{display:"flex",gap:8}}><button style={S.editBtn} onClick={()=>setTeamDraft({teamName:name,members:[...team.members],editOwner:team.owner,editKey:name})}>Edit</button><button style={S.removeBtn} onClick={()=>deleteTeam(name)}>Delete</button></div></div>))}{Object.keys(appState.teams||{}).length===0&&<p style={{color:"#A89070"}}>No teams created yet.</p>}</div>
               <div style={S.card}><h2 style={S.cardTitle}>Commissioner Powers</h2><p style={{color:"#A89070",fontSize:13,marginBottom:12}}>Grant or revoke commissioner access.</p>{Object.entries(appState.users).map(([key,u])=>{const isC=(appState.commissioners||[]).includes(key);return(<div key={key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{color:"#E8D5B5"}}>{u.displayName}</span>{isC&&<span style={S.commBadge}>COMMISH</span>}</div>{key!==currentUser&&<button style={isC?S.removeBtn:S.editBtn} onClick={()=>toggleCommissioner(key)}>{isC?"Revoke":"Grant"}</button>}</div>);})}</div>
               <div style={S.card}><h2 style={S.cardTitle}>League Settings</h2><div style={S.formRow}><label style={S.formLabel}>League Name</label><input style={S.input} value={appState.leagueName} onChange={e=>saveState({...appState,leagueName:e.target.value})}/></div></div>
               <div style={{...S.card,borderColor:"rgba(248,113,113,0.3)"}}><h2 style={{...S.cardTitle,color:"#F87171"}}>Danger Zone</h2><button style={{...S.removeBtn,padding:"8px 16px",fontSize:14}} onClick={async()=>{if(confirm("Reset ALL data? This cannot be undone.")){await saveState(DEFAULT_STATE);setCurrentUser(null);setView("login");}}}>Reset Entire League</button></div>
@@ -520,7 +678,8 @@ const globalStyles = `
   input:focus,select:focus,textarea:focus{outline:none;border-color:#FF8C42;box-shadow:0 0 0 2px rgba(255,140,66,0.2)}
   ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#1A0F05}::-webkit-scrollbar-thumb{background:#3D3020;border-radius:3px}
   select option{background:#2A1A0A;color:#E8D5B5}textarea{font-family:'Crimson Pro',serif}
-  .commish-sidebar{display:flex;flex-direction:column;gap:4px;min-width:160px}
+  .commish-sidebar{display:flex!important;flex-direction:column;gap:4px;min-width:160px}
+  .commish-mobile-tabs{display:none!important}
   @media(max-width:600px){.commish-sidebar{display:none!important}.commish-mobile-tabs{display:flex!important}}
 `;
 
@@ -558,8 +717,8 @@ const S = {
   card:{background:"rgba(42,26,10,0.6)",border:"1px solid rgba(255,140,66,0.12)",borderRadius:12,padding:24,marginBottom:20,backdropFilter:"blur(10px)"},
   cardTitle:{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:"#FFD93D",marginBottom:16,letterSpacing:1},
   teamTotal:{fontSize:48,fontWeight:900,fontFamily:"'Cinzel',serif",color:"#FF8C42",textAlign:"center",margin:"12px 0 16px",textShadow:"0 2px 30px rgba(255,140,66,0.3)"},
-  memberGrid:{display:"grid",gap:10},
-  memberCard:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"rgba(255,255,255,0.03)",borderRadius:8},
+  memberGrid:{display:"grid",gap:8},
+  memberCard:{display:"flex",alignItems:"center",gap:12,padding:"12px 16px"},
   tribeDot:{width:10,height:10,borderRadius:"50%",flexShrink:0},
   memberName:{color:"#E8D5B5",fontWeight:600,fontSize:15},
   memberTribe:{color:"#A89070",fontSize:13},
