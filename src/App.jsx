@@ -3,16 +3,16 @@ import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
 import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, getPortraitUrl } from "./gameData.js";
 
 const STOCK_LOGOS = [
-  { id: "torch",    label: "Torch",    url: "/logos/logo-torch.png" },
-  { id: "skull",    label: "Skull",    url: "/logos/logo-skull.png" },
-  { id: "serpent",  label: "Serpent",  url: "/logos/logo-serpent.png" },
-  { id: "lion",     label: "Lion",     url: "/logos/logo-lion.png" },
-  { id: "volcano",  label: "Volcano",  url: "/logos/logo-volcano.png" },
-  { id: "shield",   label: "Shield",   url: "/logos/logo-shield.png" },
-  { id: "eagle",    label: "Eagle",    url: "/logos/logo-eagle.png" },
-  { id: "moon",     label: "Moon",     url: "/logos/logo-moon.png" },
-  { id: "necklace", label: "Necklace", url: "/logos/logo-necklace.png" },
-  { id: "shark",    label: "Shark",    url: "/logos/logo-shark.png" },
+  { id: "torch",    label: "Torch",    url: "/logos/logo-torch.jpg" },
+  { id: "skull",    label: "Skull",    url: "/logos/logo-skull.jpg" },
+  { id: "serpent",  label: "Serpent",  url: "/logos/logo-serpent.jpg" },
+  { id: "lion",     label: "Lion",     url: "/logos/logo-lion.jpg" },
+  { id: "volcano",  label: "Volcano",  url: "/logos/logo-volcano.jpg" },
+  { id: "shield",   label: "Shield",   url: "/logos/logo-shield.jpg" },
+  { id: "eagle",    label: "Eagle",    url: "/logos/logo-eagle.jpg" },
+  { id: "moon",     label: "Moon",     url: "/logos/logo-moon.jpg" },
+  { id: "necklace", label: "Necklace", url: "/logos/logo-necklace.jpg" },
+  { id: "shark",    label: "Shark",    url: "/logos/logo-shark.jpg" },
 ];
 
 // ── Dev mode: access via ?dev=torchsnuffer ──
