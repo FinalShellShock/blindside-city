@@ -2,10 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
 import { SCORING_RULES, CONTESTANTS, DEFAULT_STATE } from "./gameData.js";
 import { globalStyles, S } from "./styles/theme.js";
+import { useAuth } from "./contexts/AuthContext.jsx";
 import { useScoring } from "./hooks/useScoring.js";
 import { TorchIcon } from "./components/shared/Icons.jsx";
 import FireParticles from "./components/shared/FireParticles.jsx";
 import DevPanel, { useDevMode } from "./components/shared/DevPanel.jsx";
+import LoginScreen from "./components/auth/LoginScreen.jsx";
+import RegisterScreen from "./components/auth/RegisterScreen.jsx";
+import MigrationScreen from "./components/auth/MigrationScreen.jsx";
 import HomeView from "./components/home/HomeView.jsx";
 import MyTeamView from "./components/team/MyTeamView.jsx";
 import ScoreboardView from "./components/scoreboard/ScoreboardView.jsx";
@@ -25,25 +29,17 @@ export function elimEpisode(eliminated, name) {
 
 function App() {
   const devMode = useDevMode();
+  const { firebaseUser, userProfile, loading: authLoading, logOut } = useAuth();
+
   const [appState, setAppState] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [view, setView] = useState(localStorage.getItem("bc_user") ? "home" : "login");
+  const [dataLoading, setDataLoading] = useState(true);
+  const [view, setView] = useState("home");
+  const [authScreen, setAuthScreen] = useState("login"); // "login" | "register"
   const [commishTab, setCommishTab] = useState("scoring");
-  const [loading, setLoading] = useState(true);
-  const [loginName, setLoginName] = useState("");
-  const [loginPass, setLoginPass] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isCommish, setIsCommish] = useState(false);
-  const [error, setError] = useState("");
   const [eventForm, setEventForm] = useState({ contestants: [], event: "", episode: 1 });
   const [episodeRecap, setEpisodeRecap] = useState({ episode: 1, text: "" });
 
-  // Restore saved session
-  useEffect(() => {
-    const saved = localStorage.getItem("bc_user");
-    if (saved) setCurrentUser(saved);
-  }, []);
-
+  // Load Firestore data
   useEffect(() => {
     let unsubscribe;
     async function init() {
@@ -55,7 +51,7 @@ function App() {
         console.error("Firebase load error:", err);
         setAppState(DEFAULT_STATE);
       }
-      setLoading(false);
+      setDataLoading(false);
     }
     init();
     return () => { if (unsubscribe) unsubscribe(); };
@@ -67,26 +63,9 @@ function App() {
     catch (e) { console.error("Save failed:", e); }
   }, []);
 
-  const handleLogin = async () => {
-    setError("");
-    if (!loginName.trim() || !loginPass.trim()) { setError("Enter a name and password"); return; }
-    const name = loginName.trim().toLowerCase();
-    if (isRegistering) {
-      if (appState.users[name]) { setError("Name already taken"); return; }
-      const isFirst = Object.keys(appState.users).length === 0;
-      const willBeCommish = isCommish && (appState.commissioners || []).length === 0;
-      await saveState({
-        ...appState,
-        users: { ...appState.users, [name]: { displayName: loginName.trim(), password: loginPass } },
-        commissioners: willBeCommish || isFirst ? [...(appState.commissioners || []), name] : (appState.commissioners || []),
-      });
-      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("home");
-    } else {
-      const user = appState.users[name];
-      if (!user || user.password !== loginPass) { setError("Invalid name or password"); return; }
-      localStorage.setItem("bc_user", name); setCurrentUser(name); setView("home");
-    }
-  };
+  // The user key used in appState.users / appState.commissioners / appState.teams.
+  // Migrated users keep their old username key; new Firebase users use their UID.
+  const currentUser = userProfile?.migratedFrom ?? firebaseUser?.uid ?? null;
 
   const isUserCommissioner = currentUser && (appState?.commissioners || []).includes(currentUser);
   const getUserTeam = (u) => Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === u);
@@ -195,8 +174,8 @@ function App() {
 
   const myTeam = getUserTeam(currentUser);
 
-  // ── Loading screen ──
-  if (loading) {
+  // ── Loading screen (auth or data not ready yet) ──
+  if (authLoading || dataLoading) {
     return (
       <div style={S.loadingScreen}>
         <style>{globalStyles}</style>
@@ -206,45 +185,31 @@ function App() {
     );
   }
 
-  // ── Login screen ──
-  if (view === "login" && !devMode) {
+  // ── Migration screen: legacy user with no Firebase session ──
+  const legacyKey = localStorage.getItem("bc_user");
+  if (legacyKey && !firebaseUser && !devMode) {
+    const legacyUser = appState?.users?.[legacyKey];
     return (
-      <div style={S.loginScreen}>
-        <style>{globalStyles}</style>
-        <FireParticles/>
-        <div style={S.loginCard}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <TorchIcon size={48}/>
-            <h1 style={S.title}>FANTASY SURVIVOR</h1>
-            <p style={S.subtitle}>SEASON 50 · IN THE HANDS OF THE FANS</p>
-          </div>
-          <div style={S.tabRow}>
-            <button onClick={() => { setIsRegistering(false); setError(""); }} style={{ ...S.tab, ...(!isRegistering ? S.tabActive : {}) }}>Sign In</button>
-            <button onClick={() => { setIsRegistering(true); setError(""); }} style={{ ...S.tab, ...(isRegistering ? S.tabActive : {}) }}>Register</button>
-          </div>
-          <input style={S.input} placeholder="Your name" value={loginName} onChange={e => setLoginName(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-          <input style={S.input} type="password" placeholder="Password" value={loginPass} onChange={e => setLoginPass(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-          {isRegistering && (appState.commissioners || []).length === 0 && (
-            <label style={S.checkboxLabel}>
-              <input type="checkbox" checked={isCommish} onChange={e => setIsCommish(e.target.checked)} style={{ marginRight: 8 }}/>
-              I'm the commissioner
-            </label>
-          )}
-          {error && <p style={S.error}>{error}</p>}
-          <button style={S.primaryBtn} onClick={handleLogin}>{isRegistering ? "Join the Island" : "Enter Tribal"}</button>
-          {Object.keys(appState.users).length > 0 && (
-            <p style={S.hint}>
-              {Object.keys(appState.users).length} player{Object.keys(appState.users).length !== 1 ? "s" : ""} registered
-              {(appState.commissioners || []).length > 0 && ` · Commish: ${(appState.commissioners || []).map(c => appState.users[c]?.displayName).join(", ")}`}
-            </p>
-          )}
-        </div>
-      </div>
+      <MigrationScreen
+        legacyUsername={legacyKey}
+        legacyDisplayName={legacyUser?.displayName || legacyKey}
+        onComplete={() => {
+          // MigrationScreen already removed bc_user from localStorage
+        }}
+      />
     );
   }
 
-  // ── Login screen (dev mode) ──
-  if (view === "login" && devMode) {
+  // ── Auth screens: not logged in and not a legacy user ──
+  if (!firebaseUser && !devMode) {
+    if (authScreen === "register") {
+      return <RegisterScreen onSwitchToLogin={() => setAuthScreen("login")} />;
+    }
+    return <LoginScreen onSwitchToRegister={() => setAuthScreen("register")} />;
+  }
+
+  // ── Dev mode login bypass ──
+  if (!firebaseUser && devMode) {
     return (
       <div style={S.loginScreen}>
         <style>{globalStyles}</style>
@@ -252,29 +217,17 @@ function App() {
         <div style={{ ...S.loginCard, maxWidth: 600 }}>
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <TorchIcon size={48}/>
-            <h1 style={S.title}>FANTASY SURVIVOR</h1>
+            <h1 style={S.title}>BLINDSIDE ISLAND</h1>
             <p style={S.subtitle}>DEV MODE ACTIVE</p>
           </div>
-          <DevPanel appState={appState} saveState={saveState} setCurrentUser={(u) => { setCurrentUser(u); setView("home"); }} currentUser={currentUser}/>
-          <hr style={{ border: "none", borderTop: "1px solid rgba(255,140,66,0.15)", margin: "16px 0" }}/>
-          <div style={S.tabRow}>
-            <button onClick={() => { setIsRegistering(false); setError(""); }} style={{ ...S.tab, ...(!isRegistering ? S.tabActive : {}) }}>Sign In</button>
-            <button onClick={() => { setIsRegistering(true); setError(""); }} style={{ ...S.tab, ...(isRegistering ? S.tabActive : {}) }}>Register</button>
-          </div>
-          <input style={S.input} placeholder="Your name" value={loginName} onChange={e => setLoginName(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-          <input style={S.input} type="password" placeholder="Password" value={loginPass} onChange={e => setLoginPass(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-          {isRegistering && (appState.commissioners || []).length === 0 && (
-            <label style={S.checkboxLabel}>
-              <input type="checkbox" checked={isCommish} onChange={e => setIsCommish(e.target.checked)} style={{ marginRight: 8 }}/>
-              I'm the commissioner
-            </label>
-          )}
-          {error && <p style={S.error}>{error}</p>}
-          <button style={S.primaryBtn} onClick={handleLogin}>{isRegistering ? "Join the Island" : "Enter Tribal"}</button>
+          <DevPanel appState={appState} saveState={saveState} setCurrentUser={() => {}} currentUser={currentUser}/>
         </div>
       </div>
     );
   }
+
+  // Resolve display name: prefer appState.users entry (legacy), else userProfile
+  const displayName = appState?.users?.[currentUser]?.displayName || userProfile?.displayName || "Player";
 
   // ── Main app ──
   return (
@@ -291,10 +244,13 @@ function App() {
           </div>
         </div>
         <div style={S.headerRight}>
-          <span style={S.userName}>{appState.users[currentUser]?.displayName}</span>
+          <span style={S.userName}>{displayName}</span>
           {isUserCommissioner && <span style={S.commBadge}>COMMISH</span>}
           {devMode && <span style={{ ...S.commBadge, background: "rgba(74,222,128,0.2)", color: "#4ADE80" }}>DEV</span>}
-          <button style={S.logoutBtn} onClick={() => { localStorage.removeItem("bc_user"); setCurrentUser(null); setView("login"); }}>Logout</button>
+          <button style={S.logoutBtn} onClick={async () => {
+            localStorage.removeItem("bc_user");
+            await logOut();
+          }}>Logout</button>
         </div>
       </header>
 
@@ -319,7 +275,7 @@ function App() {
 
       <main style={S.main}>
         {devMode && (
-          <DevPanel appState={appState} saveState={saveState} setCurrentUser={setCurrentUser} currentUser={currentUser}/>
+          <DevPanel appState={appState} saveState={saveState} setCurrentUser={() => {}} currentUser={currentUser}/>
         )}
 
         {view === "home" && (
@@ -389,7 +345,7 @@ function App() {
             appState={appState}
             currentUser={currentUser}
             saveState={saveState}
-            setCurrentUser={setCurrentUser}
+            setCurrentUser={() => {}}
             setView={setView}
             commishTab={commishTab}
             setCommishTab={setCommishTab}
