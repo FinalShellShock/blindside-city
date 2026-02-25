@@ -67,6 +67,17 @@ export function LeagueProvider({ children }) {
     try {
       const leagues = await getUserLeagues(uid);
       setUserLeagues(leagues);
+      // If the localStorage league ID isn't in the user's actual league list,
+      // snap to the first valid league so they don't land on an empty/wrong league.
+      if (leagues.length > 0) {
+        const storedId = localStorage.getItem(LEAGUE_KEY) || "main";
+        const valid = leagues.some(l => l.id === storedId);
+        if (!valid) {
+          const fallback = leagues[0].id;
+          setCurrentLeagueIdState(fallback);
+          localStorage.setItem(LEAGUE_KEY, fallback);
+        }
+      }
     } catch (e) {
       console.error("Failed to load user leagues:", e);
     } finally {
