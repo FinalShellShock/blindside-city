@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { loadState, saveStateToDB, subscribeToState } from "../firebase.js";
-import { CONTESTANTS, DEFAULT_STATE } from "../gameData.js";
+import { CONTESTANTS, DEFAULT_STATE, SCORING_RULES } from "../gameData.js";
 import { useScoring } from "../hooks/useScoring.js";
 
 const WATCHED_KEY = "bc_watched_through";
@@ -54,10 +54,21 @@ export function LeagueProvider({ children }) {
     return tribeOverrides[name] || CONTESTANTS.find(c => c.name === name)?.tribe || "Unknown";
   }, [tribeOverrides]);
 
+  // Merge commissioner point overrides with defaults — only stored keys are overridden
+  const effectiveScoringRules = useMemo(() => {
+    const overrides = appState?.scoringRules || {};
+    if (Object.keys(overrides).length === 0) return SCORING_RULES;
+    const merged = {};
+    Object.entries(SCORING_RULES).forEach(([k, r]) => {
+      merged[k] = overrides[k] !== undefined ? { ...r, points: overrides[k] } : r;
+    });
+    return merged;
+  }, [appState?.scoringRules]);
+
   const { contestantScores, teamScores, sortedTeams } = useScoring(
     appState?.episodes || [],
     appState?.teams || {},
-    undefined, // use default SCORING_RULES (Phase 5 will pass custom rules here)
+    effectiveScoringRules,
     watchedThrough,
   );
 
@@ -167,6 +178,7 @@ export function LeagueProvider({ children }) {
       watchedThrough,
       setWatchedThrough,
       // derived (eliminated is filtered by watchedThrough for views)
+      effectiveScoringRules,
       eliminated: visibleEliminated,
       tribeOverrides,
       getEffectiveTribe,

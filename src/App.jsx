@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { SCORING_RULES } from "./gameData.js";
 import { globalStyles, S } from "./styles/theme.js";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import { useLeague } from "./contexts/LeagueContext.jsx";
@@ -30,7 +29,7 @@ export function elimEpisode(eliminated, name) {
 function App() {
   const devMode = useDevMode();
   const { firebaseUser, userProfile, loading: authLoading, logOut } = useAuth();
-  const { appState, loading: dataLoading, saveState } = useLeague();
+  const { appState, loading: dataLoading, saveState, effectiveScoringRules } = useLeague();
 
   const [view, setView] = useState("home");
   const [authScreen, setAuthScreen] = useState("login"); // "login" | "register"
@@ -164,7 +163,7 @@ function App() {
           <div style={S.card}>
             <h2 style={S.cardTitle}>Scoring Rules</h2>
             <div style={{ display: "grid", gap: 8 }}>
-              {Object.entries(SCORING_RULES).map(([k, r]) => (
+              {Object.entries(effectiveScoringRules).map(([k, r]) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 8, borderLeft: `3px solid ${r.points >= 0 ? "#4ADE80" : "#F87171"}` }}>
                   <span style={{ color: "#E8D5B5" }}>{r.label}</span>
                   <span style={{ fontWeight: 700, fontSize: 18, fontFamily: "'Cinzel',serif", color: r.points >= 0 ? "#4ADE80" : "#F87171" }}>{r.points > 0 ? "+" : ""}{r.points}</span>

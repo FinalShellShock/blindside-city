@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
-import { CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE } from "../../gameData.js";
+import { CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
 const STOCK_LOGOS = [
@@ -159,6 +159,49 @@ export default function ToolsTab({ currentUser, setView }) {
           <label style={S.formLabel}>League Name</label>
           <input style={S.input} value={appState.leagueName} onChange={e => saveState({ ...appState, leagueName: e.target.value })}/>
         </div>
+      </div>
+
+      {/* Scoring Rules */}
+      <div style={S.card}>
+        <h2 style={S.cardTitle}>Scoring Rules</h2>
+        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>Adjust point values for your league. Changes apply to all scoring immediately.</p>
+        <div style={{ display: "grid", gap: 6 }}>
+          {Object.entries(SCORING_RULES).map(([key, rule]) => {
+            const current = (appState.scoringRules || {})[key] !== undefined
+              ? (appState.scoringRules || {})[key]
+              : rule.points;
+            const isModified = current !== rule.points;
+            return (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: isModified ? "rgba(255,140,66,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 8, border: isModified ? "1px solid rgba(255,140,66,0.2)" : "1px solid transparent" }}>
+                <span style={{ flex: 1, color: "#E8D5B5", fontSize: 14 }}>{rule.label}</span>
+                {isModified && <span style={{ fontSize: 11, color: "#A89070" }}>default: {rule.points > 0 ? "+" : ""}{rule.points}</span>}
+                <button onClick={() => {
+                  const overrides = { ...(appState.scoringRules || {}), [key]: Math.max(-20, current - 1) };
+                  saveState({ ...appState, scoringRules: overrides });
+                }} style={{ ...S.smallBtnGhost, padding: "2px 8px", fontSize: 16, lineHeight: 1 }}>−</button>
+                <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: current >= 0 ? "#4ADE80" : "#F87171", minWidth: 36, textAlign: "center" }}>
+                  {current > 0 ? "+" : ""}{current}
+                </span>
+                <button onClick={() => {
+                  const overrides = { ...(appState.scoringRules || {}), [key]: Math.min(50, current + 1) };
+                  saveState({ ...appState, scoringRules: overrides });
+                }} style={{ ...S.smallBtnGhost, padding: "2px 8px", fontSize: 16, lineHeight: 1 }}>+</button>
+                {isModified && (
+                  <button onClick={() => {
+                    const overrides = { ...(appState.scoringRules || {}) };
+                    delete overrides[key];
+                    saveState({ ...appState, scoringRules: overrides });
+                  }} style={{ ...S.smallBtnGhost, fontSize: 11, padding: "2px 6px", color: "#A89070" }}>Reset</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {Object.keys(appState.scoringRules || {}).length > 0 && (
+          <button style={{ ...S.smallBtnGhost, marginTop: 12, fontSize: 12 }} onClick={() => saveState({ ...appState, scoringRules: {} })}>
+            Reset All to Defaults
+          </button>
+        )}
       </div>
 
       {/* Danger Zone */}
