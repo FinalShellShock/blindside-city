@@ -8,7 +8,7 @@ export default function EpisodeSelector() {
   const { watchedThrough, setWatchedThrough } = useLeague();
 
   const label = watchedThrough === 0
-    ? "No spoilers"
+    ? "Last Episode Watched"
     : watchedThrough === 999
     ? "All caught up"
     : `Watched Ep ${watchedThrough}`;
@@ -16,7 +16,7 @@ export default function EpisodeSelector() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <span style={{ fontSize: 11, color: "#A89070", fontFamily: "'Cinzel',serif", letterSpacing: 1, whiteSpace: "nowrap" }}>
-        👁 {label}
+        👁 Spoiler Filter:
       </span>
       <select
         value={watchedThrough}
@@ -33,7 +33,7 @@ export default function EpisodeSelector() {
           outline: "none",
         }}
       >
-        <option value={0}>No spoilers</option>
+        <option value={0}>Last Episode Watched</option>
         {Array.from({ length: MAX_EPISODE }, (_, i) => i + 1).map(ep => (
           <option key={ep} value={ep}>Ep {ep}</option>
         ))}
