@@ -14,6 +14,7 @@ export default function DraftBoard({ currentUser, isCommissioner }) {
   const { appState, currentLeagueId, contestants, tribeColors, getEffectiveTribe, saveState } = useLeague();
   const {
     draftState,
+    draftLoading,
     isMyTurn,
     currentPickUserId,
     availableContestants,
@@ -23,7 +24,32 @@ export default function DraftBoard({ currentUser, isCommissioner }) {
     picksPerPlayer,
   } = useDraft(currentUser);
 
-  if (!draftState) return null;
+  if (draftLoading) return (
+    <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
+      <p style={{ color: "#A89070", fontFamily: "'Cinzel',serif" }}>Loading draft...</p>
+    </div>
+  );
+
+  if (!draftState || draftState.status === 'reset') return (
+    <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
+      <p style={{ color: "#F87171", fontFamily: "'Cinzel',serif", fontSize: 16, marginBottom: 12 }}>
+        Draft state not found.
+      </p>
+      <p style={{ color: "#A89070", fontSize: 14, marginBottom: 20 }}>
+        The draft may not have started correctly. The commissioner can reset and try again.
+      </p>
+      {isCommissioner && (
+        <button
+          style={S.primaryBtn}
+          onClick={async () => {
+            await saveState({ ...appState, draftStatus: 'pending' });
+          }}
+        >
+          Back to Lobby
+        </button>
+      )}
+    </div>
+  );
 
   const users = appState?.users || {};
   const isLive = (draftState.timerSeconds || 0) > 0;

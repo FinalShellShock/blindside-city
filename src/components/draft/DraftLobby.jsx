@@ -37,11 +37,14 @@ export default function DraftLobby({ currentUser, isCommissioner }) {
         return;
       }
       const snakeOrder = buildSnakeOrder(draftOrder, picksPerPlayer);
-      // Save settings to appState so they persist
-      await saveState({ ...appState, draftStatus: 'active', draftSettings: { picksPerPlayer, timerSeconds, draftOrder } });
+      // Write draft subcollection doc FIRST — if this fails we don't mark the league as active
       await startDraft(currentLeagueId, { order: snakeOrder, timerSeconds, picksPerPlayer });
+      // Only update league doc after draft state is confirmed written
+      await saveState({ ...appState, draftStatus: 'active', draftSettings: { picksPerPlayer, timerSeconds, draftOrder } });
     } catch (e) {
       console.error("Failed to start draft:", e);
+      // Roll back to pending so the commissioner can try again or cancel
+      await saveState({ ...appState, draftStatus: 'pending', draftSettings: { picksPerPlayer, timerSeconds, draftOrder } }).catch(() => {});
       alert("Failed to start draft: " + (e?.message || e?.code || "unknown error"));
     }
     setBusy(false);
