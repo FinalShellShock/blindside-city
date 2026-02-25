@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { CONTESTANTS, TRIBE_COLORS } from './gameData.js';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import {
   getAuth,
   onAuthStateChanged,
@@ -72,10 +72,16 @@ export async function createLeague(uid, displayName, leagueName, initialState) {
     tribeColors: TRIBE_COLORS,
   });
 
-  // Add league to the user's profile
-  await updateDoc(doc(db, 'users', uid), {
-    leagues: arrayUnion({ id: leagueId, name: leagueName, role: 'commissioner' }),
-  });
+  // Add league to the user's profile (setDoc+merge works even if `leagues` field is missing)
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  const existing = userSnap.exists() ? (userSnap.data().leagues || []) : [];
+  const alreadyIn = existing.some(l => l.id === leagueId);
+  if (!alreadyIn) {
+    await setDoc(userRef, {
+      leagues: [...existing, { id: leagueId, name: leagueName, role: 'commissioner' }],
+    }, { merge: true });
+  }
 
   return leagueId;
 }
@@ -97,10 +103,16 @@ export async function joinLeagueByCode(uid, displayName, inviteCode) {
     users: { ...leagueData.users, [uid]: { displayName } },
   }, { merge: true });
 
-  // Add league to user's profile
-  await updateDoc(doc(db, 'users', uid), {
-    leagues: arrayUnion({ id: leagueId, name: leagueData.leagueName, role: 'member' }),
-  });
+  // Add league to user's profile (setDoc+merge works even if `leagues` field is missing)
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  const existing = userSnap.exists() ? (userSnap.data().leagues || []) : [];
+  const alreadyIn = existing.some(l => l.id === leagueId);
+  if (!alreadyIn) {
+    await setDoc(userRef, {
+      leagues: [...existing, { id: leagueId, name: leagueData.leagueName, role: 'member' }],
+    }, { merge: true });
+  }
 
   return leagueId;
 }

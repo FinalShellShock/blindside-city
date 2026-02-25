@@ -38,21 +38,25 @@ function App() {
   const [commishTab, setCommishTab] = useState("scoring");
   const [eventForm, setEventForm] = useState({ contestants: [], event: "", episode: 1 });
   const [episodeRecap, setEpisodeRecap] = useState({ episode: 1, text: "" });
+  // Dev-mode user impersonation override (null = use the real derived currentUser)
+  const [devUserOverride, setDevUserOverride] = useState(null);
 
   // The user key used in appState.users / appState.commissioners / appState.teams.
   // Migrated users keep their old username key; new Firebase users use their UID.
-  const currentUser = userProfile?.migratedFrom ?? firebaseUser?.uid ?? null;
+  // In dev mode, setDevUserOverride lets you impersonate any user in appState.
+  const derivedCurrentUser = userProfile?.migratedFrom ?? firebaseUser?.uid ?? null;
+  const currentUser = (devMode && devUserOverride) ? devUserOverride : derivedCurrentUser;
 
   const isUserCommissioner = currentUser && (appState?.commissioners || []).includes(currentUser);
   const myTeam = Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === currentUser);
   const displayName = appState?.users?.[currentUser]?.displayName || userProfile?.displayName || "Player";
 
-  // Load the user's league list whenever currentUser resolves (including null).
+  // Load the user's league list whenever the real (non-impersonated) user resolves.
   // Always calling refreshUserLeagues ensures leaguesLoaded gets set even when
-  // currentUser is null (logged out / auth still settling), preventing a hang.
+  // derivedCurrentUser is null (logged out / auth still settling), preventing a hang.
   useEffect(() => {
-    refreshUserLeagues(currentUser);
-  }, [currentUser, refreshUserLeagues]);
+    refreshUserLeagues(derivedCurrentUser);
+  }, [derivedCurrentUser, refreshUserLeagues]);
 
   // ── Loading screen ──
   if (authLoading || dataLoading || (currentUser && !leaguesLoaded)) {
@@ -98,7 +102,7 @@ function App() {
             <h1 style={S.title}>BLINDSIDE ISLAND</h1>
             <p style={S.subtitle}>DEV MODE ACTIVE</p>
           </div>
-          <DevPanel appState={appState} saveState={saveState} setCurrentUser={() => {}} currentUser={currentUser}/>
+          <DevPanel appState={appState} saveState={saveState} setCurrentUser={setDevUserOverride} currentUser={currentUser}/>
         </div>
       </div>
     );
@@ -162,7 +166,7 @@ function App() {
 
       <main style={S.main}>
         {devMode && (
-          <DevPanel appState={appState} saveState={saveState} setCurrentUser={() => {}} currentUser={currentUser}/>
+          <DevPanel appState={appState} saveState={saveState} setCurrentUser={setDevUserOverride} currentUser={currentUser}/>
         )}
 
         {view === "home" && <HomeView currentUser={currentUser} myTeam={myTeam}/>}

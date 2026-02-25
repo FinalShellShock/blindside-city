@@ -21,8 +21,12 @@ export default function JoinCreateLeague({ currentUser, displayName }) {
       const id = await joinLeague(currentUser, displayName, inviteCode.trim());
       if (!id) setError("Invalid invite code. Double-check and try again.");
     } catch (e) {
-      setError("Something went wrong. Try again.");
-      console.error(e);
+      console.error("Join league error:", e);
+      if (e?.code === "permission-denied") {
+        setError("Permission denied — your account may not have access to this feature yet. Try logging out and back in.");
+      } else {
+        setError(`Something went wrong: ${e?.message || e?.code || "unknown error"}`);
+      }
     }
     setBusy(false);
   };
@@ -34,8 +38,12 @@ export default function JoinCreateLeague({ currentUser, displayName }) {
     try {
       await createNewLeague(currentUser, displayName, leagueName.trim());
     } catch (e) {
-      setError("Something went wrong. Try again.");
-      console.error(e);
+      console.error("Create league error:", e);
+      if (e?.code === "permission-denied") {
+        setError("Permission denied — your account may not have access to this feature yet. Try logging out and back in.");
+      } else {
+        setError(`Something went wrong: ${e?.message || e?.code || "unknown error"}`);
+      }
     }
     setBusy(false);
   };

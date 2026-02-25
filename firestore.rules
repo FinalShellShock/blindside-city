@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── User profiles ──
+    // Users can read/write their own profile doc.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── League documents ──
+    // Any authenticated user can read a league doc (needed to load the app).
+    // Any authenticated user can create a new league doc.
+    // League members (listed in the users map) can update the league doc.
+    // Commissioners (listed in commissioners array) can do anything.
+    match /leagues/{leagueId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        request.auth.uid in resource.data.commissioners ||
+        request.auth.uid in resource.data.users
+      );
+      allow delete: if request.auth != null &&
+        request.auth.uid in resource.data.commissioners;
+    }
+
+    // ── Invite codes ──
+    // Any authenticated user can read a code doc (to verify an invite code).
+    // Any authenticated user can write a code doc (commissioner creating/regenerating).
+    match /inviteCodes/{code} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}
