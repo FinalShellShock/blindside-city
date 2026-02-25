@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
-export default function LeagueSwitcher({ currentUser, displayName }) {
+export default function LeagueSwitcher({ onJoinCreate }) {
   const { appState, currentLeagueId, setCurrentLeagueId, userLeagues } = useLeague();
   const [open, setOpen] = useState(false);
 
@@ -17,22 +17,6 @@ export default function LeagueSwitcher({ currentUser, displayName }) {
   const leagueList = hasCurrentInList
     ? knownLeagues
     : [{ id: currentLeagueId, name: leagueName, role: "member" }, ...knownLeagues];
-
-  if (leagueList.length <= 1) {
-    // Single league — just show the name, no switcher needed
-    return (
-      <h1 style={{
-        fontFamily: "'Cinzel',serif",
-        fontSize: 18,
-        fontWeight: 700,
-        color: "#FF8C42",
-        margin: 0,
-        letterSpacing: 1,
-      }}>
-        {leagueName}
-      </h1>
-    );
-  }
 
   return (
     <div style={{ position: "relative" }}>
@@ -98,6 +82,25 @@ export default function LeagueSwitcher({ currentUser, displayName }) {
               )}
             </button>
           ))}
+          {/* Always show join/create option at the bottom */}
+          <button
+            onClick={() => { onJoinCreate(); setOpen(false); }}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              borderTop: "1px solid rgba(255,140,66,0.2)",
+              padding: "10px 14px",
+              cursor: "pointer",
+              color: "#FF8C42",
+              fontFamily: "'Crimson Pro',serif",
+              fontSize: 14,
+            }}
+          >
+            + Join or Create League
+          </button>
         </div>
       )}
     </div>

@@ -4,7 +4,7 @@ import { TorchIcon } from "../shared/Icons.jsx";
 import FireParticles from "../shared/FireParticles.jsx";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
-export default function JoinCreateLeague({ currentUser, displayName }) {
+export default function JoinCreateLeague({ currentUser, displayName, onBack }) {
   const { createNewLeague, joinLeague } = useLeague();
 
   const [tab, setTab] = useState("join"); // "join" | "create"
@@ -20,6 +20,7 @@ export default function JoinCreateLeague({ currentUser, displayName }) {
     try {
       const id = await joinLeague(currentUser, displayName, inviteCode.trim());
       if (!id) setError("Invalid invite code. Double-check and try again.");
+      else if (onBack) onBack(); // dismiss overlay on success
     } catch (e) {
       console.error("Join league error:", e);
       if (e?.code === "permission-denied") {
@@ -37,6 +38,7 @@ export default function JoinCreateLeague({ currentUser, displayName }) {
     setError("");
     try {
       await createNewLeague(currentUser, displayName, leagueName.trim());
+      if (onBack) onBack(); // dismiss overlay on success
     } catch (e) {
       console.error("Create league error:", e);
       if (e?.code === "permission-denied") {
@@ -58,6 +60,14 @@ export default function JoinCreateLeague({ currentUser, displayName }) {
           <h1 style={S.title}>BLINDSIDE ISLAND</h1>
           <p style={S.subtitle}>Welcome, {displayName}</p>
         </div>
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{ background: "none", border: "none", color: "#A89070", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0, fontFamily: "'Crimson Pro',serif" }}
+          >
+            ← Back to league
+          </button>
+        )}
 
         {/* Tab row */}
         <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.1)", marginBottom: 24 }}>

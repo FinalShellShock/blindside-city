@@ -40,6 +40,8 @@ function App() {
   const [episodeRecap, setEpisodeRecap] = useState({ episode: 1, text: "" });
   // Dev-mode user impersonation override (null = use the real derived currentUser)
   const [devUserOverride, setDevUserOverride] = useState(null);
+  // Show join/create overlay from within the app (via LeagueSwitcher dropdown)
+  const [showJoinCreate, setShowJoinCreate] = useState(false);
 
   // The user key used in appState.users / appState.commissioners / appState.teams.
   // Migrated users keep their old username key; new Firebase users use their UID.
@@ -115,9 +117,13 @@ function App() {
   // if appState loaded but has no users map, treat it as no league.
   const isLegacyUser = !!userProfile?.migratedFrom || !!legacyKey;
   const leagueIsReal = isLegacyUser || userLeagues.length > 0 || (appState?.users && Object.keys(appState.users).length > 0);
-  if (!leagueIsReal && !devMode) {
+  if ((!leagueIsReal || showJoinCreate) && !devMode) {
     return (
-      <JoinCreateLeague currentUser={currentUser} displayName={displayName} />
+      <JoinCreateLeague
+        currentUser={currentUser}
+        displayName={displayName}
+        onBack={leagueIsReal ? () => setShowJoinCreate(false) : null}
+      />
     );
   }
 
@@ -131,7 +137,7 @@ function App() {
         <div style={S.headerLeft}>
           <TorchIcon size={28}/>
           <div>
-            <LeagueSwitcher currentUser={currentUser} displayName={displayName} />
+            <LeagueSwitcher onJoinCreate={() => setShowJoinCreate(true)} />
             <p style={S.headerSub}>Season 50</p>
           </div>
         </div>
