@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { loadState, saveStateToDB, subscribeToState, createLeague, joinLeagueByCode, getUserLeagues, regenerateInviteCode } from "../firebase.js";
+import { loadState, saveStateToDB, subscribeToState, createLeague, joinLeagueByCode, getUserLeagues, regenerateInviteCode, deleteLeague } from "../firebase.js";
 import { CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, SCORING_RULES } from "../gameData.js";
 import { useScoring } from "../hooks/useScoring.js";
 
@@ -97,6 +97,12 @@ export function LeagueProvider({ children }) {
     setAppState(prev => ({ ...prev, inviteCode: newCode }));
     return newCode;
   }, [currentLeagueId, appState?.inviteCode]);
+
+  const removeLeague = useCallback(async (uid, leagueId, inviteCode, fallbackLeagueId) => {
+    await deleteLeague(uid, leagueId, inviteCode);
+    await refreshUserLeagues(uid);
+    setCurrentLeagueId(fallbackLeagueId);
+  }, [refreshUserLeagues, setCurrentLeagueId]);
 
   // ── Derived state ──
   // eliminated = raw list from Firestore (all episodes)
@@ -246,6 +252,7 @@ export function LeagueProvider({ children }) {
       createNewLeague,
       joinLeague,
       regenInviteCode,
+      removeLeague,
       // spoiler protection
       watchedThrough,
       setWatchedThrough,

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { DEFAULT_STATE, SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 import { resetDraft } from "../../firebase.js";
 
 const STOCK_LOGOS = [
@@ -30,7 +31,8 @@ function isElim(eliminated, name) {
 }
 
 export default function ToolsTab({ currentUser, setView }) {
-  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, contestants, tribeColors, currentLeagueId } = useLeague();
+  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, removeLeague, contestants, tribeColors, currentLeagueId, userLeagues } = useLeague();
+  const { firebaseUser } = useAuth();
   const [copied, setCopied] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);
   // custom rules: editingId = which custom rule's name is being edited inline
@@ -420,12 +422,21 @@ export default function ToolsTab({ currentUser, setView }) {
       {/* Danger Zone */}
       <div style={{ ...S.card, borderColor: "rgba(248,113,113,0.3)" }}>
         <h2 style={{ ...S.cardTitle, color: "#F87171" }}>Danger Zone</h2>
-        <button style={{ ...S.removeBtn, padding: "8px 16px", fontSize: 14 }} onClick={async () => {
-          if (confirm("Reset ALL data? This cannot be undone.")) {
-            await saveState(DEFAULT_STATE);
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button style={{ ...S.removeBtn, padding: "8px 16px", fontSize: 14 }} onClick={async () => {
+            if (confirm("Reset ALL data? This cannot be undone.")) {
+              await saveState(DEFAULT_STATE);
+              setView("home");
+            }
+          }}>Reset Entire League</button>
+          <button style={{ ...S.removeBtn, padding: "8px 16px", fontSize: 14 }} onClick={async () => {
+            if (!confirm(`Permanently delete "${appState?.leagueName || "this league"}"? All data will be lost and cannot be recovered.`)) return;
+            if (!confirm("Are you sure? This is irreversible.")) return;
+            const fallback = userLeagues.find(l => l.id !== currentLeagueId)?.id || "main";
+            await removeLeague(firebaseUser?.uid, currentLeagueId, appState?.inviteCode, fallback);
             setView("home");
-          }
-        }}>Reset Entire League</button>
+          }}>Delete League</button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { CONTESTANTS, TRIBE_COLORS } from './gameData.js';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import {
   getAuth,
   onAuthStateChanged,
@@ -132,6 +132,26 @@ export async function regenerateInviteCode(leagueId, oldCode) {
   await setDoc(doc(db, 'inviteCodes', newCode), { leagueId });
   await setDoc(leagueDoc(leagueId), { inviteCode: newCode }, { merge: true });
   return newCode;
+}
+
+// Delete a league and remove it from the current user's profile.
+// Other members will simply lose access when they next load the app.
+export async function deleteLeague(uid, leagueId, inviteCode) {
+  // Revoke the invite code so no new members can join
+  if (inviteCode) {
+    await setDoc(doc(db, 'inviteCodes', inviteCode), { leagueId: '__revoked__' });
+  }
+  // Delete the league doc itself
+  await deleteDoc(leagueDoc(leagueId));
+  // Remove from current user's profile leagues array
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    const existing = userSnap.data().leagues || [];
+    await setDoc(userRef, {
+      leagues: existing.filter(l => l.id !== leagueId),
+    }, { merge: true });
+  }
 }
 
 // Get the list of leagues stored on a user profile (may be undefined for legacy users)
