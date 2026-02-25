@@ -7,6 +7,7 @@ import {
   signOut,
   getUserProfile,
   createUserProfile,
+  updateUserProfile,
 } from "../firebase.js";
 
 const AuthContext = createContext(null);
@@ -73,6 +74,12 @@ export function AuthProvider({ children }) {
     return cred;
   }
 
+  async function updateProfile(updates) {
+    if (!firebaseUser) return;
+    await updateUserProfile(firebaseUser.uid, updates);
+    setUserProfile(prev => ({ ...prev, ...updates }));
+  }
+
   async function logOut() {
     await signOut();
     setFirebaseUser(null);
@@ -90,6 +97,7 @@ export function AuthProvider({ children }) {
       signIn,
       signInGoogle,
       logOut,
+      updateProfile,
     }}>
       {children}
     </AuthContext.Provider>

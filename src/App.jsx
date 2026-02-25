@@ -17,6 +17,10 @@ import LeagueSwitcher from "./components/shared/LeagueSwitcher.jsx";
 import JoinCreateLeague from "./components/league/JoinCreateLeague.jsx";
 import DraftLobby from "./components/draft/DraftLobby.jsx";
 import DraftBoard from "./components/draft/DraftBoard.jsx";
+import AccountPanel from "./components/account/AccountPanel.jsx";
+
+const STOCK_AVATARS = Array.from({ length: 8 }, (_, i) => `/avatars/avatar${i + 1}.png`);
+function randomAvatar() { return STOCK_AVATARS[Math.floor(Math.random() * STOCK_AVATARS.length)]; }
 
 // ── Elimination helpers (shared across the app) ──
 export function normEliminated(eliminated) {
@@ -31,7 +35,7 @@ export function elimEpisode(eliminated, name) {
 
 function App() {
   const devMode = useDevMode();
-  const { firebaseUser, userProfile, loading: authLoading, logOut } = useAuth();
+  const { firebaseUser, userProfile, loading: authLoading, logOut, updateProfile } = useAuth();
   const { appState, loading: dataLoading, saveState, effectiveScoringRules, currentLeagueId, refreshUserLeagues, userLeagues, leaguesLoaded } = useLeague();
 
   const [view, setView] = useState("home");
@@ -43,6 +47,7 @@ function App() {
   const [devUserOverride, setDevUserOverride] = useState(null);
   // Show join/create overlay from within the app (via LeagueSwitcher dropdown)
   const [showJoinCreate, setShowJoinCreate] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
 
   // The user key used in appState.users / appState.commissioners / appState.teams.
   // Migrated users keep their old username key; new Firebase users use their UID.
@@ -53,6 +58,13 @@ function App() {
   const isUserCommissioner = currentUser && (appState?.commissioners || []).includes(currentUser);
   const myTeam = Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === currentUser);
   const displayName = userProfile?.displayName || appState?.users?.[currentUser]?.displayName || "Player";
+
+  // Assign a random avatar to users who don't have one yet
+  useEffect(() => {
+    if (firebaseUser && userProfile && !userProfile.avatar) {
+      updateProfile({ avatar: randomAvatar() });
+    }
+  }, [firebaseUser, userProfile]);
 
   // Load the user's league list whenever the real (non-impersonated) user resolves.
   // Always calling refreshUserLeagues ensures leaguesLoaded gets set even when
@@ -142,7 +154,18 @@ function App() {
         </div>
         <div style={S.headerRight}>
           <EpisodeSelector/>
-          <span style={S.userName}>{displayName}</span>
+          {userProfile?.avatar && (
+            <img
+              src={userProfile.avatar}
+              alt="avatar"
+              style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,140,66,0.3)", cursor: "pointer" }}
+              onClick={() => setShowAccount(true)}
+            />
+          )}
+          <span
+            style={{ ...S.userName, cursor: "pointer", textDecoration: "underline", textDecorationColor: "rgba(255,140,66,0.4)" }}
+            onClick={() => setShowAccount(true)}
+          >{displayName}</span>
           {isUserCommissioner && <span style={S.commBadge}>COMMISH</span>}
           {devMode && <span style={{ ...S.commBadge, background: "rgba(74,222,128,0.2)", color: "#4ADE80" }}>DEV</span>}
           <button style={S.logoutBtn} onClick={async () => {
@@ -184,6 +207,8 @@ function App() {
           </button>
         )}
       </nav>
+
+      {showAccount && <AccountPanel onClose={() => setShowAccount(false)} />}
 
       <main style={S.main}>
         {devMode && (

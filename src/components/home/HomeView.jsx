@@ -32,14 +32,18 @@ export default function HomeView({ currentUser, myTeam }) {
           <h2 style={S.cardTitle}>League Members</h2>
           {Object.entries(appState.users || {}).length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {Object.entries(appState.users).map(([key, user]) => (
-                <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,140,66,0.15)", border: "1px solid rgba(255,140,66,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
-                    🧑‍🌾
+              {Object.entries(appState.users).map(([key, user]) => {
+                const name = user.displayName || key;
+                const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+                return (
+                  <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,140,66,0.15)", border: "1px solid rgba(255,140,66,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: 700, color: "#FF8C42", flexShrink: 0 }}>
+                      {initials}
+                    </div>
+                    <span style={{ color: "#E8D5B5", fontSize: 15 }}>{name}</span>
                   </div>
-                  <span style={{ color: "#E8D5B5", fontSize: 15 }}>{user.displayName || key}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p style={{ color: "#A89070" }}>No members yet.</p>
