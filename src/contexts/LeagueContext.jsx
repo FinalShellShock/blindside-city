@@ -3,11 +3,23 @@ import { loadState, saveStateToDB, subscribeToState } from "../firebase.js";
 import { CONTESTANTS, DEFAULT_STATE } from "../gameData.js";
 import { useScoring } from "../hooks/useScoring.js";
 
+const WATCHED_KEY = "bc_watched_through";
+
 const LeagueContext = createContext(null);
 
 export function LeagueProvider({ children }) {
   const [appState, setAppState] = useState(null);
   const [loading, setLoading] = useState(true);
+  // 0 = haven't watched anything yet, 999 = fully caught up (no spoiler filter)
+  const [watchedThrough, setWatchedThroughState] = useState(() => {
+    const saved = localStorage.getItem(WATCHED_KEY);
+    return saved !== null ? parseInt(saved, 10) : 0;
+  });
+
+  const setWatchedThrough = useCallback((ep) => {
+    setWatchedThroughState(ep);
+    localStorage.setItem(WATCHED_KEY, String(ep));
+  }, []);
 
   useEffect(() => {
     let unsubscribe;
@@ -33,6 +45,8 @@ export function LeagueProvider({ children }) {
   }, []);
 
   // ── Derived state ──
+  // eliminated = raw list from Firestore (all episodes)
+  // visibleEliminated = filtered by watchedThrough (exposed to views as `eliminated`)
   const eliminated = appState?.eliminated || [];
   const tribeOverrides = appState?.tribeOverrides || {};
 
@@ -43,12 +57,24 @@ export function LeagueProvider({ children }) {
   const { contestantScores, teamScores, sortedTeams } = useScoring(
     appState?.episodes || [],
     appState?.teams || {},
+    undefined, // use default SCORING_RULES (Phase 5 will pass custom rules here)
+    watchedThrough,
   );
+
+  // Only show eliminations that happened in episodes the user has watched
+  const visibleEliminated = watchedThrough === 999
+    ? eliminated
+    : eliminated.filter(e => {
+        const obj = typeof e === "string" ? { name: e, episode: null } : e;
+        return obj.episode === null || obj.episode <= watchedThrough;
+      });
 
   const feedEpisodes = (() => {
     if (!appState) return [];
-    const normElim = (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
-    const feed = [...(appState.episodes || [])]
+    const normElim = visibleEliminated.map(e => typeof e === "string" ? { name: e, episode: null } : e);
+    // Only show episodes at or before watchedThrough
+    const visibleEps = (appState.episodes || []).filter(ep => watchedThrough === 999 || ep.number <= watchedThrough);
+    const feed = [...visibleEps]
       .filter(ep => ep.recap || (ep.events || []).length > 0 || normElim.some(e => e.episode === ep.number))
       .sort((a, b) => b.number - a.number);
     normElim.filter(e => e.episode).forEach(elim => {
@@ -137,15 +163,18 @@ export function LeagueProvider({ children }) {
       appState,
       loading,
       saveState,
-      // derived
-      eliminated,
+      // spoiler protection
+      watchedThrough,
+      setWatchedThrough,
+      // derived (eliminated is filtered by watchedThrough for views)
+      eliminated: visibleEliminated,
       tribeOverrides,
       getEffectiveTribe,
       contestantScores,
       teamScores,
       sortedTeams,
       feedEpisodes,
-      // actions
+      // actions (use raw `eliminated` for writes so we don't lose unaired data)
       addEvent,
       removeEvent,
       saveRecap,

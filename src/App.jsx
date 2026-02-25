@@ -14,6 +14,7 @@ import MyTeamView from "./components/team/MyTeamView.jsx";
 import ScoreboardView from "./components/scoreboard/ScoreboardView.jsx";
 import CastView from "./components/cast/CastView.jsx";
 import CommissionerPanel from "./components/commissioner/CommissionerPanel.jsx";
+import EpisodeSelector from "./components/shared/EpisodeSelector.jsx";
 
 // ── Elimination helpers (shared across the app) ──
 export function normEliminated(eliminated) {
@@ -110,6 +111,7 @@ function App() {
           </div>
         </div>
         <div style={S.headerRight}>
+          <EpisodeSelector/>
           <span style={S.userName}>{displayName}</span>
           {isUserCommissioner && <span style={S.commBadge}>COMMISH</span>}
           {devMode && <span style={{ ...S.commBadge, background: "rgba(74,222,128,0.2)", color: "#4ADE80" }}>DEV</span>}
