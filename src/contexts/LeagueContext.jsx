@@ -64,9 +64,14 @@ export function LeagueProvider({ children }) {
   // ── League management actions ──
   const refreshUserLeagues = useCallback(async (uid) => {
     if (!uid) { setLeaguesLoaded(true); return; }
-    const leagues = await getUserLeagues(uid);
-    setUserLeagues(leagues);
-    setLeaguesLoaded(true);
+    try {
+      const leagues = await getUserLeagues(uid);
+      setUserLeagues(leagues);
+    } catch (e) {
+      console.error("Failed to load user leagues:", e);
+    } finally {
+      setLeaguesLoaded(true);
+    }
   }, []);
 
   const createNewLeague = useCallback(async (uid, displayName, leagueName) => {

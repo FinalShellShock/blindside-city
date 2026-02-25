@@ -47,9 +47,11 @@ function App() {
   const myTeam = Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === currentUser);
   const displayName = appState?.users?.[currentUser]?.displayName || userProfile?.displayName || "Player";
 
-  // Load the user's league list once they're authenticated
+  // Load the user's league list whenever currentUser resolves (including null).
+  // Always calling refreshUserLeagues ensures leaguesLoaded gets set even when
+  // currentUser is null (logged out / auth still settling), preventing a hang.
   useEffect(() => {
-    if (currentUser) refreshUserLeagues(currentUser);
+    refreshUserLeagues(currentUser);
   }, [currentUser, refreshUserLeagues]);
 
   // ── Loading screen ──
