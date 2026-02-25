@@ -150,7 +150,7 @@ function App() {
         @media (max-width: 480px) {
           .header-display-name { display: none !important; }
           .header-logo { height: 36px !important; }
-          .header-right { gap: 8px !important; }
+          .header-right { gap: 8px !important; margin-left: auto !important; }
         }
       `}</style>
       <FireParticles/>
