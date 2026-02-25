@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { S } from "../../styles/theme.js";
 import { DEFAULT_STATE, SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
@@ -28,6 +28,26 @@ function normEliminated(eliminated) {
 }
 function isElim(eliminated, name) {
   return normEliminated(eliminated).some(e => e.name === name);
+}
+
+function Tip({ text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ background: "none", border: "1px solid rgba(255,140,66,0.3)", borderRadius: "50%", width: 18, height: 18, color: "#A89070", fontSize: 11, cursor: "pointer", fontFamily: "'Cinzel',serif", fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+      >?</button>
+      {open && (
+        <span
+          onClick={() => setOpen(false)}
+          style={{ position: "absolute", top: 24, left: 0, zIndex: 50, background: "rgba(26,15,5,0.98)", border: "1px solid rgba(255,140,66,0.25)", borderRadius: 8, padding: "10px 14px", width: 240, color: "#C8B89A", fontSize: 13, lineHeight: 1.5, boxShadow: "0 4px 20px rgba(0,0,0,0.5)", cursor: "default" }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export default function ToolsTab({ currentUser, setView }) {
@@ -86,7 +106,7 @@ export default function ToolsTab({ currentUser, setView }) {
     <div>
       {/* Draft */}
       <div style={S.card}>
-        <h2 style={S.cardTitle}>Draft</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Draft <Tip text="Run a live snake draft where players take turns picking contestants. Open the lobby first, then start when everyone has joined. You can also skip the draft and assign teams manually below." /></h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
           Run a snake draft to assign contestants to teams. Teams are created automatically when the draft completes. You can also skip drafting and assign teams manually below.
         </p>
@@ -154,7 +174,7 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Announcement */}
       <div style={S.card}>
-        <h2 style={S.cardTitle}>League Announcement</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>League Announcement <Tip text="Post a message that appears as a banner at the top of the app for all league members. Great for draft reminders, episode night alerts, or trash talk. Clear it when it's no longer relevant." /></h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 12 }}>Shows as a banner at the top for all players, and on the Home page.</p>
         <input style={S.input} placeholder="e.g. Draft party Saturday at 7pm!" value={announcementDraft} onChange={e => setAnnouncementDraft(e.target.value)}/>
         <div style={{ display: "flex", gap: 8 }}>
@@ -165,7 +185,7 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Manage Teams */}
       <div style={S.card}>
-        <h2 style={S.cardTitle}>Manage Teams</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Manage Teams <Tip text="Manually create or edit teams without using the draft. Pick an owner, a team name, and select their contestants. Use this if you're assigning teams by hand or need to make corrections after the draft." /></h2>
         <div style={S.formRow}>
           <label style={S.formLabel}>Team Name</label>
           <input style={S.input} placeholder="e.g. Kaloboration" value={teamDraft.teamName} onChange={e => setTeamDraft({ ...teamDraft, teamName: e.target.value })}/>
@@ -226,7 +246,7 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Commissioner Powers */}
       <div style={S.card}>
-        <h2 style={S.cardTitle}>Commissioner Powers</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Commissioner Powers <Tip text="Grant other league members commissioner access so they can also manage scoring, teams, and tools. You cannot revoke your own commissioner status." /></h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 12 }}>Grant or revoke commissioner access.</p>
         {Object.entries(appState.users).map(([key, u]) => {
           const isC = (appState.commissioners || []).includes(key);
@@ -244,7 +264,7 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* League Settings */}
       <div style={S.card}>
-        <h2 style={S.cardTitle}>League Settings</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>League Settings <Tip text="Rename your league. The name appears in the header switcher and on the join/create screen." /></h2>
         <div style={S.formRow}>
           <label style={S.formLabel}>League Name</label>
           <input style={S.input} value={appState.leagueName} onChange={e => saveState({ ...appState, leagueName: e.target.value })}/>
@@ -382,7 +402,7 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Invite Code */}
       <div style={S.card}>
-        <h2 style={S.cardTitle}>Invite Code</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Invite Code <Tip text="Share this code with anyone you want to invite to the league. They'll enter it on the Join screen. Regenerate to invalidate the old code if needed." /></h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
           Share this code with players so they can join this league.
         </p>
@@ -421,7 +441,7 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Danger Zone */}
       <div style={{ ...S.card, borderColor: "rgba(248,113,113,0.3)" }}>
-        <h2 style={{ ...S.cardTitle, color: "#F87171" }}>Danger Zone</h2>
+        <h2 style={{ ...S.cardTitle, color: "#F87171", display: "flex", alignItems: "center", gap: 8 }}>Danger Zone <Tip text="Reset wipes all league data back to defaults (teams, scores, episodes). Delete permanently removes the entire league. Both actions are irreversible." /></h2>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button style={{ ...S.removeBtn, padding: "8px 16px", fontSize: 14 }} onClick={async () => {
             if (confirm("Reset ALL data? This cannot be undone.")) {

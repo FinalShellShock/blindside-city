@@ -18,6 +18,7 @@ import JoinCreateLeague from "./components/league/JoinCreateLeague.jsx";
 import DraftLobby from "./components/draft/DraftLobby.jsx";
 import DraftBoard from "./components/draft/DraftBoard.jsx";
 import AccountPanel from "./components/account/AccountPanel.jsx";
+import HelpPanel from "./components/shared/HelpPanel.jsx";
 
 const STOCK_AVATARS = Array.from({ length: 8 }, (_, i) => `/avatars/avatar${i + 1}.png`);
 function randomAvatar() { return STOCK_AVATARS[Math.floor(Math.random() * STOCK_AVATARS.length)]; }
@@ -48,6 +49,7 @@ function App() {
   // Show join/create overlay from within the app (via LeagueSwitcher dropdown)
   const [showJoinCreate, setShowJoinCreate] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   // The user key used in appState.users / appState.commissioners / appState.teams.
   // Migrated users keep their old username key; new Firebase users use their UID.
@@ -168,6 +170,11 @@ function App() {
           >{displayName}</span>
           {isUserCommissioner && <span style={S.commBadge}>COMMISH</span>}
           {devMode && <span style={{ ...S.commBadge, background: "rgba(74,222,128,0.2)", color: "#4ADE80" }}>DEV</span>}
+          <button
+            onClick={() => setShowHelp(true)}
+            title="Help"
+            style={{ ...S.logoutBtn, fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13 }}
+          >?</button>
           <button style={S.logoutBtn} onClick={async () => {
             localStorage.removeItem("bc_user");
             await logOut();
@@ -207,6 +214,8 @@ function App() {
           </button>
         )}
       </nav>
+
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
 
       {showAccount && (
         <AccountPanel
@@ -274,6 +283,12 @@ function App() {
           />
         )}
       </main>
+
+      <footer style={{ textAlign: "center", padding: "24px 16px", borderTop: "1px solid rgba(255,140,66,0.08)", marginTop: 8 }}>
+        <p style={{ color: "#4A3828", fontSize: 12, fontFamily: "'Cinzel',serif", letterSpacing: 1 }}>
+          © {new Date().getFullYear()} Blindside Island. All rights reserved.
+        </p>
+      </footer>
     </div>
   );
 }
