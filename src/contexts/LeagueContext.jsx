@@ -1,15 +1,22 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { loadState, saveStateToDB, subscribeToState } from "../firebase.js";
+import { loadState, saveStateToDB, subscribeToState, createLeague, joinLeagueByCode, getUserLeagues, regenerateInviteCode } from "../firebase.js";
 import { CONTESTANTS, DEFAULT_STATE, SCORING_RULES } from "../gameData.js";
 import { useScoring } from "../hooks/useScoring.js";
 
 const WATCHED_KEY = "bc_watched_through";
+const LEAGUE_KEY = "bc_league_id";
 
 const LeagueContext = createContext(null);
 
 export function LeagueProvider({ children }) {
   const [appState, setAppState] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentLeagueId, setCurrentLeagueIdState] = useState(() => {
+    return localStorage.getItem(LEAGUE_KEY) || "main";
+  });
+  const [userLeagues, setUserLeagues] = useState([]); // [{ id, name, role }]
+  const [leaguesLoaded, setLeaguesLoaded] = useState(false);
+
   // 0 = haven't watched anything yet, 999 = fully caught up (no spoiler filter)
   const [watchedThrough, setWatchedThroughState] = useState(() => {
     const saved = localStorage.getItem(WATCHED_KEY);
@@ -21,28 +28,67 @@ export function LeagueProvider({ children }) {
     localStorage.setItem(WATCHED_KEY, String(ep));
   }, []);
 
+  const setCurrentLeagueId = useCallback((id) => {
+    setCurrentLeagueIdState(id);
+    localStorage.setItem(LEAGUE_KEY, id);
+    // Reset spoiler protection when switching leagues
+    setWatchedThroughState(0);
+    localStorage.setItem(WATCHED_KEY, "0");
+  }, []);
+
   useEffect(() => {
     let unsubscribe;
     async function init() {
       try {
-        const initial = await loadState();
+        const initial = await loadState(currentLeagueId);
         setAppState(initial || DEFAULT_STATE);
-        unsubscribe = subscribeToState((ns) => setAppState(ns));
+        unsubscribe = subscribeToState((ns) => setAppState(ns), currentLeagueId);
       } catch (err) {
         console.error("Firebase load error:", err);
         setAppState(DEFAULT_STATE);
       }
       setLoading(false);
     }
+    setLoading(true);
+    setAppState(null);
     init();
     return () => { if (unsubscribe) unsubscribe(); };
-  }, []);
+  }, [currentLeagueId]);
 
   const saveState = useCallback(async (ns) => {
     setAppState(ns);
-    try { await saveStateToDB(ns); }
+    try { await saveStateToDB(ns, currentLeagueId); }
     catch (e) { console.error("Save failed:", e); }
+  }, [currentLeagueId]);
+
+  // ── League management actions ──
+  const refreshUserLeagues = useCallback(async (uid) => {
+    if (!uid) { setLeaguesLoaded(true); return; }
+    const leagues = await getUserLeagues(uid);
+    setUserLeagues(leagues);
+    setLeaguesLoaded(true);
   }, []);
+
+  const createNewLeague = useCallback(async (uid, displayName, leagueName) => {
+    const leagueId = await createLeague(uid, displayName, leagueName, DEFAULT_STATE);
+    await refreshUserLeagues(uid);
+    setCurrentLeagueId(leagueId);
+    return leagueId;
+  }, [refreshUserLeagues, setCurrentLeagueId]);
+
+  const joinLeague = useCallback(async (uid, displayName, inviteCode) => {
+    const leagueId = await joinLeagueByCode(uid, displayName, inviteCode);
+    if (!leagueId) return null;
+    await refreshUserLeagues(uid);
+    setCurrentLeagueId(leagueId);
+    return leagueId;
+  }, [refreshUserLeagues, setCurrentLeagueId]);
+
+  const regenInviteCode = useCallback(async () => {
+    const newCode = await regenerateInviteCode(currentLeagueId, appState?.inviteCode);
+    setAppState(prev => ({ ...prev, inviteCode: newCode }));
+    return newCode;
+  }, [currentLeagueId, appState?.inviteCode]);
 
   // ── Derived state ──
   // eliminated = raw list from Firestore (all episodes)
@@ -174,6 +220,15 @@ export function LeagueProvider({ children }) {
       appState,
       loading,
       saveState,
+      // league management
+      currentLeagueId,
+      setCurrentLeagueId,
+      userLeagues,
+      leaguesLoaded,
+      refreshUserLeagues,
+      createNewLeague,
+      joinLeague,
+      regenInviteCode,
       // spoiler protection
       watchedThrough,
       setWatchedThrough,

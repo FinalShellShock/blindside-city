@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { globalStyles, S } from "./styles/theme.js";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import { useLeague } from "./contexts/LeagueContext.jsx";
@@ -14,6 +14,8 @@ import ScoreboardView from "./components/scoreboard/ScoreboardView.jsx";
 import CastView from "./components/cast/CastView.jsx";
 import CommissionerPanel from "./components/commissioner/CommissionerPanel.jsx";
 import EpisodeSelector from "./components/shared/EpisodeSelector.jsx";
+import LeagueSwitcher from "./components/shared/LeagueSwitcher.jsx";
+import JoinCreateLeague from "./components/league/JoinCreateLeague.jsx";
 
 // ── Elimination helpers (shared across the app) ──
 export function normEliminated(eliminated) {
@@ -29,7 +31,7 @@ export function elimEpisode(eliminated, name) {
 function App() {
   const devMode = useDevMode();
   const { firebaseUser, userProfile, loading: authLoading, logOut } = useAuth();
-  const { appState, loading: dataLoading, saveState, effectiveScoringRules } = useLeague();
+  const { appState, loading: dataLoading, saveState, effectiveScoringRules, currentLeagueId, refreshUserLeagues, userLeagues, leaguesLoaded } = useLeague();
 
   const [view, setView] = useState("home");
   const [authScreen, setAuthScreen] = useState("login"); // "login" | "register"
@@ -45,8 +47,13 @@ function App() {
   const myTeam = Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === currentUser);
   const displayName = appState?.users?.[currentUser]?.displayName || userProfile?.displayName || "Player";
 
+  // Load the user's league list once they're authenticated
+  useEffect(() => {
+    if (currentUser) refreshUserLeagues(currentUser);
+  }, [currentUser, refreshUserLeagues]);
+
   // ── Loading screen ──
-  if (authLoading || dataLoading) {
+  if (authLoading || dataLoading || (currentUser && !leaguesLoaded)) {
     return (
       <div style={S.loadingScreen}>
         <style>{globalStyles}</style>
@@ -95,6 +102,17 @@ function App() {
     );
   }
 
+  // ── New user with no league: show join/create splash ──
+  // A legacy user always lands on "main". A brand-new Firebase user with no leagues
+  // and no legacy key should pick or create a league before entering the app.
+  const isLegacyUser = !!userProfile?.migratedFrom || !!legacyKey;
+  const hasLeague = isLegacyUser || currentLeagueId !== "main" || userLeagues.length > 0;
+  if (!hasLeague && !devMode) {
+    return (
+      <JoinCreateLeague currentUser={currentUser} displayName={displayName} />
+    );
+  }
+
   // ── Main app ──
   return (
     <div style={S.appContainer}>
@@ -105,7 +123,7 @@ function App() {
         <div style={S.headerLeft}>
           <TorchIcon size={28}/>
           <div>
-            <h1 style={S.headerTitle}>{appState.leagueName}</h1>
+            <LeagueSwitcher currentUser={currentUser} displayName={displayName} />
             <p style={S.headerSub}>Season 50</p>
           </div>
         </div>

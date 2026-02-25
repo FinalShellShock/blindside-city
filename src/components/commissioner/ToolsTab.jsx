@@ -29,7 +29,23 @@ function isElim(eliminated, name) {
 }
 
 export default function ToolsTab({ currentUser, setView }) {
-  const { appState, saveState, eliminated, getEffectiveTribe } = useLeague();
+  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode } = useLeague();
+  const [copied, setCopied] = useState(false);
+  const [regenBusy, setRegenBusy] = useState(false);
+
+  const handleCopyCode = () => {
+    if (!appState?.inviteCode) return;
+    navigator.clipboard.writeText(appState.inviteCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleRegenCode = async () => {
+    setRegenBusy(true);
+    await regenInviteCode();
+    setRegenBusy(false);
+  };
   const [announcementDraft, setAnnouncementDraft] = useState(appState.announcement || "");
   const [teamDraft, setTeamDraft] = useState({ teamName: "", members: [], editOwner: null, editKey: null });
 
@@ -202,6 +218,45 @@ export default function ToolsTab({ currentUser, setView }) {
             Reset All to Defaults
           </button>
         )}
+      </div>
+
+      {/* Invite Code */}
+      <div style={S.card}>
+        <h2 style={S.cardTitle}>Invite Code</h2>
+        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
+          Share this code with players so they can join this league.
+        </p>
+        {appState?.inviteCode ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <span style={{
+              fontFamily: "'Cinzel',serif",
+              fontSize: 28,
+              fontWeight: 700,
+              color: "#FF8C42",
+              letterSpacing: 6,
+              background: "rgba(255,140,66,0.08)",
+              border: "1px solid rgba(255,140,66,0.25)",
+              borderRadius: 8,
+              padding: "8px 20px",
+              flex: 1,
+              textAlign: "center",
+            }}>
+              {appState.inviteCode}
+            </span>
+            <button style={S.editBtn} onClick={handleCopyCode}>
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+        ) : (
+          <p style={{ color: "#A89070", fontSize: 13, marginBottom: 12 }}>No invite code yet — click Generate to create one.</p>
+        )}
+        <button
+          style={{ ...S.smallBtnGhost, fontSize: 12, opacity: regenBusy ? 0.5 : 1 }}
+          onClick={handleRegenCode}
+          disabled={regenBusy}
+        >
+          {regenBusy ? "Generating..." : appState?.inviteCode ? "Regenerate Code" : "Generate Code"}
+        </button>
       </div>
 
       {/* Danger Zone */}

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import {
   getAuth,
   onAuthStateChanged,
@@ -25,22 +25,99 @@ export const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
 
-// ── Legacy Firestore helpers (Blindside City — leagues/main) ──
-const STATE_DOC = doc(db, 'leagues', 'main');
+// ── League state helpers (leagues/{leagueId}) ──
+function leagueDoc(leagueId) {
+  return doc(db, 'leagues', leagueId);
+}
 
-export async function loadState() {
-  const snap = await getDoc(STATE_DOC);
+export async function loadState(leagueId = 'main') {
+  const snap = await getDoc(leagueDoc(leagueId));
   return snap.exists() ? snap.data() : null;
 }
 
-export async function saveStateToDB(state) {
-  await setDoc(STATE_DOC, state);
+export async function saveStateToDB(state, leagueId = 'main') {
+  await setDoc(leagueDoc(leagueId), state);
 }
 
-export function subscribeToState(callback) {
-  return onSnapshot(STATE_DOC, (snap) => {
+export function subscribeToState(callback, leagueId = 'main') {
+  return onSnapshot(leagueDoc(leagueId), (snap) => {
     if (snap.exists()) callback(snap.data());
   });
+}
+
+// ── League management helpers ──
+
+// Generate a random 6-character alphanumeric invite code
+function generateInviteCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// Create a brand-new league. Returns the new leagueId.
+export async function createLeague(uid, displayName, leagueName, initialState) {
+  const leagueId = Math.random().toString(36).substring(2, 10);
+  const inviteCode = generateInviteCode();
+
+  // Write invite code lookup doc
+  await setDoc(doc(db, 'inviteCodes', inviteCode), { leagueId });
+
+  // Write the league document
+  await setDoc(leagueDoc(leagueId), {
+    ...initialState,
+    leagueName,
+    commissioners: [uid],
+    inviteCode,
+    users: { [uid]: { displayName } },
+  });
+
+  // Add league to the user's profile
+  await updateDoc(doc(db, 'users', uid), {
+    leagues: arrayUnion({ id: leagueId, name: leagueName, role: 'commissioner' }),
+  });
+
+  return leagueId;
+}
+
+// Join a league via invite code. Returns the leagueId or null if invalid.
+export async function joinLeagueByCode(uid, displayName, inviteCode) {
+  const codeDoc = doc(db, 'inviteCodes', inviteCode.toUpperCase());
+  const codeSnap = await getDoc(codeDoc);
+  if (!codeSnap.exists()) return null;
+
+  const { leagueId } = codeSnap.data();
+  const leagueSnap = await getDoc(leagueDoc(leagueId));
+  if (!leagueSnap.exists()) return null;
+
+  const leagueData = leagueSnap.data();
+
+  // Add user to league's users map (merge so existing keys aren't wiped)
+  await setDoc(leagueDoc(leagueId), {
+    users: { ...leagueData.users, [uid]: { displayName } },
+  }, { merge: true });
+
+  // Add league to user's profile
+  await updateDoc(doc(db, 'users', uid), {
+    leagues: arrayUnion({ id: leagueId, name: leagueData.leagueName, role: 'member' }),
+  });
+
+  return leagueId;
+}
+
+// Regenerate the invite code for a league (commissioner only). Returns new code.
+export async function regenerateInviteCode(leagueId, oldCode) {
+  const newCode = generateInviteCode();
+  // Remove old code doc if present
+  if (oldCode) {
+    await setDoc(doc(db, 'inviteCodes', oldCode), { leagueId: '__revoked__' });
+  }
+  await setDoc(doc(db, 'inviteCodes', newCode), { leagueId });
+  await setDoc(leagueDoc(leagueId), { inviteCode: newCode }, { merge: true });
+  return newCode;
+}
+
+// Get the list of leagues stored on a user profile (may be undefined for legacy users)
+export async function getUserLeagues(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  return snap.exists() ? (snap.data().leagues || []) : [];
 }
 
 // ── Firebase Auth helpers ──

@@ -1,0 +1,132 @@
+import { useState } from "react";
+import { S, globalStyles } from "../../styles/theme.js";
+import { TorchIcon } from "../shared/Icons.jsx";
+import FireParticles from "../shared/FireParticles.jsx";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
+
+export default function JoinCreateLeague({ currentUser, displayName }) {
+  const { createNewLeague, joinLeague } = useLeague();
+
+  const [tab, setTab] = useState("join"); // "join" | "create"
+  const [inviteCode, setInviteCode] = useState("");
+  const [leagueName, setLeagueName] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleJoin = async () => {
+    if (!inviteCode.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const id = await joinLeague(currentUser, displayName, inviteCode.trim());
+      if (!id) setError("Invalid invite code. Double-check and try again.");
+    } catch (e) {
+      setError("Something went wrong. Try again.");
+      console.error(e);
+    }
+    setBusy(false);
+  };
+
+  const handleCreate = async () => {
+    if (!leagueName.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      await createNewLeague(currentUser, displayName, leagueName.trim());
+    } catch (e) {
+      setError("Something went wrong. Try again.");
+      console.error(e);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div style={S.loginScreen}>
+      <style>{globalStyles}</style>
+      <FireParticles />
+      <div style={{ ...S.loginCard, maxWidth: 440 }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <TorchIcon size={48} />
+          <h1 style={S.title}>BLINDSIDE ISLAND</h1>
+          <p style={S.subtitle}>Welcome, {displayName}</p>
+        </div>
+
+        {/* Tab row */}
+        <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.1)", marginBottom: 24 }}>
+          {[
+            { id: "join", label: "Join a League" },
+            { id: "create", label: "Create a League" },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setTab(t.id); setError(""); }}
+              style={{
+                flex: 1,
+                background: "none",
+                border: "none",
+                borderBottom: tab === t.id ? "2px solid #FF8C42" : "2px solid transparent",
+                color: tab === t.id ? "#FF8C42" : "#A89070",
+                fontFamily: "'Cinzel',serif",
+                fontSize: 13,
+                letterSpacing: 1,
+                padding: "10px 0",
+                cursor: "pointer",
+                marginBottom: -1,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "join" && (
+          <div>
+            <p style={{ color: "#A89070", fontSize: 14, marginBottom: 16 }}>
+              Enter the invite code from your league commissioner.
+            </p>
+            <input
+              style={S.input}
+              placeholder="e.g. AB12CD"
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === "Enter" && handleJoin()}
+              maxLength={6}
+            />
+            {error && <p style={S.error}>{error}</p>}
+            <button
+              style={{ ...S.primaryBtn, marginTop: 8, opacity: busy ? 0.6 : 1 }}
+              onClick={handleJoin}
+              disabled={busy || !inviteCode.trim()}
+            >
+              {busy ? "Joining..." : "Join League"}
+            </button>
+          </div>
+        )}
+
+        {tab === "create" && (
+          <div>
+            <p style={{ color: "#A89070", fontSize: 14, marginBottom: 16 }}>
+              Start a new league. You'll be the commissioner.
+            </p>
+            <input
+              style={S.input}
+              placeholder="League name, e.g. Survivor Nerds 2025"
+              value={leagueName}
+              onChange={e => setLeagueName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleCreate()}
+              maxLength={50}
+            />
+            {error && <p style={S.error}>{error}</p>}
+            <button
+              style={{ ...S.primaryBtn, marginTop: 8, opacity: busy ? 0.6 : 1 }}
+              onClick={handleCreate}
+              disabled={busy || !leagueName.trim()}
+            >
+              {busy ? "Creating..." : "Create League"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
