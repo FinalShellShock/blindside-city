@@ -49,7 +49,7 @@ function App() {
 
   const isUserCommissioner = currentUser && (appState?.commissioners || []).includes(currentUser);
   const myTeam = Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === currentUser);
-  const displayName = appState?.users?.[currentUser]?.displayName || userProfile?.displayName || "Player";
+  const displayName = userProfile?.displayName || appState?.users?.[currentUser]?.displayName || "Player";
 
   // Load the user's league list whenever the real (non-impersonated) user resolves.
   // Always calling refreshUserLeagues ensures leaguesLoaded gets set even when
