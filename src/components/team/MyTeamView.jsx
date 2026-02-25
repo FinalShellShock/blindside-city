@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
-import { CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 import Portrait from "../shared/Portrait.jsx";
 import MiniChart from "../shared/MiniChart.jsx";
@@ -20,9 +19,9 @@ const STOCK_LOGOS = [
 ];
 
 const MERGED_COLOR = "#FFD93D";
-function tribeColor(tribe) {
+function tribeColor(tribeColors, tribe) {
   if (tribe === "Merged") return MERGED_COLOR;
-  return TRIBE_COLORS[tribe] || "#666";
+  return tribeColors[tribe] || "#666";
 }
 function normEliminated(eliminated) {
   return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
@@ -35,7 +34,7 @@ function elimEpisode(eliminated, name) {
 }
 
 export default function MyTeamView({ currentUser, myTeam, isUserCommissioner }) {
-  const { appState, saveState, contestantScores, teamScores, eliminated, tribeOverrides, getEffectiveTribe } = useLeague();
+  const { appState, saveState, contestantScores, teamScores, eliminated, tribeOverrides, getEffectiveTribe, contestants, tribeColors } = useLeague();
   const [editingTeamName, setEditingTeamName] = useState(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [editingMotto, setEditingMotto] = useState(null);
@@ -150,7 +149,7 @@ export default function MyTeamView({ currentUser, myTeam, isUserCommissioner }) 
 
         <div style={S.memberGrid}>
           {teamData.members.map(m => {
-            const c = CONTESTANTS.find(x => x.name === m);
+            const c = contestants.find(x => x.name === m);
             const isE = isElim(eliminated, m);
             const currentTribe = getEffectiveTribe(m);
             const tribeChanged = tribeOverrides[m] && tribeOverrides[m] !== c?.tribe;
@@ -164,11 +163,11 @@ export default function MyTeamView({ currentUser, myTeam, isUserCommissioner }) 
             return (
               <div key={m} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid rgba(255,255,255,0.05)" }}>
                 <div onClick={() => setExpandedMember(isExpanded ? null : m)} style={{ ...S.memberCard, cursor: "pointer", background: isExpanded ? "rgba(255,140,66,0.07)" : "rgba(255,255,255,0.03)", opacity: isE ? 0.6 : 1 }}>
-                  <Portrait slug={c?.slug} tribe={currentTribe} size={40} eliminated={isE}/>
+                  <Portrait slug={c?.slug} tribe={currentTribe} size={40} eliminated={isE} tribeColors={tribeColors}/>
                   <div style={{ flex: 1 }}>
                     <p style={{ ...S.memberName, textDecoration: isE ? "line-through" : "none" }}>{m} {isE && <SkullIcon size={12}/>}</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
-                      <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 3, background: tribeColor(currentTribe) + "33", color: tribeColor(currentTribe), fontWeight: 700 }}>{currentTribe}</span>
+                      <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 3, background: tribeColor(tribeColors, currentTribe) + "33", color: tribeColor(tribeColors, currentTribe), fontWeight: 700 }}>{currentTribe}</span>
                       {tribeChanged && <span style={{ fontSize: 11, color: "#A89070", textDecoration: "line-through" }}>{c?.tribe}</span>}
                       {isE && <span style={{ fontSize: 11, color: "#F87171" }}>· Elim. Ep {elimEpisode(eliminated, m) || "?"}</span>}
                     </div>

@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
-import { CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 import Portrait from "../shared/Portrait.jsx";
 import { SkullIcon } from "../shared/Icons.jsx";
 
 const MERGED_COLOR = "#FFD93D";
-function tribeColor(tribe) {
+function tribeColor(tribeColors, tribe) {
   if (tribe === "Merged") return MERGED_COLOR;
-  return TRIBE_COLORS[tribe] || "#666";
+  return tribeColors[tribe] || "#666";
 }
 function normEliminated(eliminated) {
   return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
@@ -21,7 +20,7 @@ function elimEpisode(eliminated, name) {
 }
 
 export default function CastView() {
-  const { appState, contestantScores, eliminated, tribeOverrides, getEffectiveTribe } = useLeague();
+  const { appState, contestantScores, eliminated, tribeOverrides, getEffectiveTribe, contestants, tribeColors } = useLeague();
   const [expandedCast, setExpandedCast] = useState(null);
 
   return (
@@ -30,7 +29,7 @@ export default function CastView() {
         <h2 style={S.cardTitle}>All Contestants</h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>Sorted by points · tap a player to see their scoring breakdown</p>
         <div style={{ display: "grid", gap: 6 }}>
-          {[...CONTESTANTS].sort((a, b) => (contestantScores[b.name]?.total || 0) - (contestantScores[a.name]?.total || 0)).map((c, i) => {
+          {[...contestants].sort((a, b) => (contestantScores[b.name]?.total || 0) - (contestantScores[a.name]?.total || 0)).map((c, i) => {
             const isE = isElim(eliminated, c.name);
             const owner = Object.entries(appState.teams || {}).find(([_, t]) => t.members.includes(c.name));
             const score = contestantScores[c.name]?.total || 0;
@@ -45,18 +44,18 @@ export default function CastView() {
                   display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
                   borderRadius: 8,
                   background: isExpanded ? "rgba(255,140,66,0.08)" : "rgba(255,255,255,0.02)",
-                  cursor: "pointer", borderLeft: `3px solid ${tribeColor(currentTribe)}`,
+                  cursor: "pointer", borderLeft: `3px solid ${tribeColor(tribeColors, currentTribe)}`,
                   opacity: isE ? 0.55 : 1, transition: "background 0.15s",
                 }}>
                   <span style={{ color: "#A89070", fontFamily: "'Cinzel',serif", fontWeight: 600, width: 26, fontSize: 13, textAlign: "center" }}>{i + 1}</span>
-                  <Portrait slug={c.slug} tribe={currentTribe} size={36} eliminated={isE}/>
+                  <Portrait slug={c.slug} tribe={currentTribe} size={36} eliminated={isE} tribeColors={tribeColors}/>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span style={{ color: "#E8D5B5", fontWeight: 600, fontSize: 15, textDecoration: isE ? "line-through" : "none" }}>{c.name}</span>
                       {isE && <SkullIcon size={12}/>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 3, background: tribeColor(currentTribe) + "22", color: tribeColor(currentTribe), fontWeight: 600 }}>{currentTribe}</span>
+                      <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 3, background: tribeColor(tribeColors, currentTribe) + "22", color: tribeColor(tribeColors, currentTribe), fontWeight: 600 }}>{currentTribe}</span>
                       {tribeChanged && <span style={{ fontSize: 11, color: "#A89070", textDecoration: "line-through" }}>{c.tribe}</span>}
                       {isE && epNum && <span style={{ fontSize: 11, color: "#F87171" }}>· Elim. Ep {epNum}</span>}
                       {owner && <span style={{ fontSize: 11, color: "#A89070" }}>· {owner[0]}</span>}
@@ -66,7 +65,7 @@ export default function CastView() {
                   <span style={{ color: "#A89070", fontSize: 11, transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▼</span>
                 </div>
                 {isExpanded && (
-                  <div style={{ marginLeft: 29, padding: "12px 16px", background: "rgba(42,26,10,0.4)", borderRadius: "0 0 8px 8px", borderLeft: `3px solid ${tribeColor(currentTribe)}` }}>
+                  <div style={{ marginLeft: 29, padding: "12px 16px", background: "rgba(42,26,10,0.4)", borderRadius: "0 0 8px 8px", borderLeft: `3px solid ${tribeColor(tribeColors, currentTribe)}` }}>
                     {events.length > 0 ? (() => {
                       const byEp = {};
                       events.forEach(ev => {

@@ -1,12 +1,12 @@
 import { S } from "../../styles/theme.js";
-import { CONTESTANTS, TRIBE_COLORS, SCORING_RULES } from "../../gameData.js";
+import { SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 import ReactionBar from "../shared/ReactionBar.jsx";
 
 const MERGED_COLOR = "#FFD93D";
-function tribeColor(tribe) {
+function tribeColor(tribeColors, tribe) {
   if (tribe === "Merged") return MERGED_COLOR;
-  return TRIBE_COLORS[tribe] || "#666";
+  return tribeColors[tribe] || "#666";
 }
 
 function normEliminated(eliminated) {
@@ -14,7 +14,7 @@ function normEliminated(eliminated) {
 }
 
 export default function HomeView({ currentUser, myTeam }) {
-  const { appState, sortedTeams, feedEpisodes, eliminated, addReaction, getEffectiveTribe } = useLeague();
+  const { appState, sortedTeams, feedEpisodes, eliminated, addReaction, getEffectiveTribe, tribeColors } = useLeague();
 
   return (
     <div>
@@ -93,7 +93,7 @@ export default function HomeView({ currentUser, myTeam }) {
                           return (
                             <div key={i}>
                               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px" }}>
-                                <span style={{ fontWeight: 700, fontSize: 14, color: tribeColor(curTribe), flexShrink: 0 }}>{ev.contestant}</span>
+                                <span style={{ fontWeight: 700, fontSize: 14, color: tribeColor(tribeColors, curTribe), flexShrink: 0 }}>{ev.contestant}</span>
                                 <span style={{ color: "#A89070", fontSize: 13, flex: 1 }}>{rule.label}</span>
                                 <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
                                   {rule.points > 0 ? "+" : ""}{rule.points}

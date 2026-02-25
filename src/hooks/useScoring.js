@@ -1,14 +1,13 @@
 import { SCORING_RULES, CONTESTANTS } from "../gameData.js";
 
-// Accepts optional scoringRules override (for per-league rules in Phase 5)
-// and optional upToEpisode filter (for spoiler protection in Phase 4).
-// Defaults keep behavior identical to the original monolith.
-export function useScoring(episodes = [], teams = {}, scoringRules = SCORING_RULES, upToEpisode = 999) {
+// Accepts optional scoringRules override (Phase 5), upToEpisode filter (Phase 4),
+// and contestants list (Phase 7 — falls back to hardcoded defaults).
+export function useScoring(episodes = [], teams = {}, scoringRules = SCORING_RULES, upToEpisode = 999, contestants = CONTESTANTS) {
   const filteredEpisodes = episodes.filter(ep => ep.number <= upToEpisode);
 
   const getContestantScores = () => {
     const s = {};
-    CONTESTANTS.forEach(c => { s[c.name] = { total: 0, events: [], byEpisode: {} }; });
+    contestants.forEach(c => { s[c.name] = { total: 0, events: [], byEpisode: {} }; });
     filteredEpisodes.forEach(ep => {
       (ep.events || []).forEach(ev => {
         const r = scoringRules[ev.type];

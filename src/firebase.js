@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { CONTESTANTS, TRIBE_COLORS } from './gameData.js';
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import {
   getAuth,
@@ -60,13 +61,15 @@ export async function createLeague(uid, displayName, leagueName, initialState) {
   // Write invite code lookup doc
   await setDoc(doc(db, 'inviteCodes', inviteCode), { leagueId });
 
-  // Write the league document
+  // Write the league document — seed cast and tribe colors from game defaults
   await setDoc(leagueDoc(leagueId), {
     ...initialState,
     leagueName,
     commissioners: [uid],
     inviteCode,
     users: { [uid]: { displayName } },
+    contestants: CONTESTANTS,
+    tribeColors: TRIBE_COLORS,
   });
 
   // Add league to the user's profile

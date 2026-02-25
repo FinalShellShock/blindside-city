@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
-import { TRIBE_COLORS } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 import MiniChart from "../shared/MiniChart.jsx";
 import { SkullIcon } from "../shared/Icons.jsx";
 
 const MERGED_COLOR = "#FFD93D";
-function tribeColor(tribe) {
+function tribeColor(tribeColors, tribe) {
   if (tribe === "Merged") return MERGED_COLOR;
-  return TRIBE_COLORS[tribe] || "#666";
+  return tribeColors[tribe] || "#666";
 }
 function normEliminated(eliminated) {
   return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
@@ -18,7 +17,7 @@ function isElim(eliminated, name) {
 }
 
 export default function ScoreboardView() {
-  const { appState, sortedTeams, teamScores, eliminated, getEffectiveTribe } = useLeague();
+  const { appState, sortedTeams, teamScores, eliminated, getEffectiveTribe, tribeColors } = useLeague();
   const [expandedTeam, setExpandedTeam] = useState(null);
 
   return (
@@ -57,7 +56,7 @@ export default function ScoreboardView() {
                   const curTribe = getEffectiveTribe(member);
                   return (
                     <div key={member} style={S.lbMemberRow}>
-                      <div style={{ ...S.tribeDot, background: tribeColor(curTribe) }}/>
+                      <div style={{ ...S.tribeDot, background: tribeColor(tribeColors, curTribe) }}/>
                       <span style={{ flex: 1, color: "#E8D5B5", textDecoration: isE ? "line-through" : "none", opacity: isE ? 0.5 : 1 }}>
                         {member} {isE && <SkullIcon size={12}/>}
                       </span>

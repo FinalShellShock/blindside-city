@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
-import { CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, SCORING_RULES } from "../../gameData.js";
+import { DEFAULT_STATE, SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
 const STOCK_LOGOS = [
@@ -17,9 +17,9 @@ const STOCK_LOGOS = [
 ];
 
 const MERGED_COLOR = "#FFD93D";
-function tribeColor(tribe) {
+function tribeColor(tribeColors, tribe) {
   if (tribe === "Merged") return MERGED_COLOR;
-  return TRIBE_COLORS[tribe] || "#666";
+  return tribeColors[tribe] || "#666";
 }
 function normEliminated(eliminated) {
   return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
@@ -29,7 +29,7 @@ function isElim(eliminated, name) {
 }
 
 export default function ToolsTab({ currentUser, setView }) {
-  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode } = useLeague();
+  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, contestants, tribeColors } = useLeague();
   const [copied, setCopied] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);
 
@@ -106,12 +106,12 @@ export default function ToolsTab({ currentUser, setView }) {
         <div style={S.formRow}>
           <label style={S.formLabel}>Contestants ({teamDraft.members.length} selected)</label>
           <div style={S.contestantPicker}>
-            {CONTESTANTS.map(c => {
+            {contestants.map(c => {
               const sel = teamDraft.members.includes(c.name);
               const curTribe = getEffectiveTribe(c.name);
               return (
                 <button key={c.name} onClick={() => setTeamDraft({ ...teamDraft, members: sel ? teamDraft.members.filter(m => m !== c.name) : [...teamDraft.members, c.name] })}
-                  style={{ ...S.contestantChip, background: sel ? tribeColor(curTribe) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(curTribe) : "rgba(255,255,255,0.1)" }}>
+                  style={{ ...S.contestantChip, background: sel ? tribeColor(tribeColors, curTribe) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(tribeColors, curTribe) : "rgba(255,255,255,0.1)" }}>
                   {c.name}
                 </button>
               );
@@ -134,7 +134,7 @@ export default function ToolsTab({ currentUser, setView }) {
                 {team.members.map(m => {
                   const curTribe = getEffectiveTribe(m);
                   return (
-                    <span key={m} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: tribeColor(curTribe) + "33", color: tribeColor(curTribe), textDecoration: isElim(eliminated, m) ? "line-through" : "none" }}>
+                    <span key={m} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: tribeColor(tribeColors, curTribe) + "33", color: tribeColor(tribeColors, curTribe), textDecoration: isElim(eliminated, m) ? "line-through" : "none" }}>
                       {m}
                     </span>
                   );

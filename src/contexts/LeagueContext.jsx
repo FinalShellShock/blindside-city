@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { loadState, saveStateToDB, subscribeToState, createLeague, joinLeagueByCode, getUserLeagues, regenerateInviteCode } from "../firebase.js";
-import { CONTESTANTS, DEFAULT_STATE, SCORING_RULES } from "../gameData.js";
+import { CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, SCORING_RULES } from "../gameData.js";
 import { useScoring } from "../hooks/useScoring.js";
 
 const WATCHED_KEY = "bc_watched_through";
@@ -96,9 +96,14 @@ export function LeagueProvider({ children }) {
   const eliminated = appState?.eliminated || [];
   const tribeOverrides = appState?.tribeOverrides || {};
 
+  // contestants/tribeColors: use league-specific data if present, fall back to game defaults
+  // This ensures leagues/main (no seeded data) and any pre-Phase-7 league still work.
+  const contestants = appState?.contestants || CONTESTANTS;
+  const tribeColors = appState?.tribeColors || TRIBE_COLORS;
+
   const getEffectiveTribe = useCallback((name) => {
-    return tribeOverrides[name] || CONTESTANTS.find(c => c.name === name)?.tribe || "Unknown";
-  }, [tribeOverrides]);
+    return tribeOverrides[name] || contestants.find(c => c.name === name)?.tribe || "Unknown";
+  }, [tribeOverrides, contestants]);
 
   // Merge commissioner point overrides with defaults — only stored keys are overridden
   const effectiveScoringRules = useMemo(() => {
@@ -116,6 +121,7 @@ export function LeagueProvider({ children }) {
     appState?.teams || {},
     effectiveScoringRules,
     watchedThrough,
+    contestants,
   );
 
   // Only show eliminations that happened in episodes the user has watched
@@ -234,6 +240,8 @@ export function LeagueProvider({ children }) {
       setWatchedThrough,
       // derived (eliminated is filtered by watchedThrough for views)
       effectiveScoringRules,
+      contestants,
+      tribeColors,
       eliminated: visibleEliminated,
       tribeOverrides,
       getEffectiveTribe,

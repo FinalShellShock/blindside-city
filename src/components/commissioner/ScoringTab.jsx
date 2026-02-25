@@ -1,11 +1,11 @@
 import { S } from "../../styles/theme.js";
-import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
+import { SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
 const MERGED_COLOR = "#FFD93D";
-function tribeColor(tribe) {
+function tribeColor(tribeColors, tribe) {
   if (tribe === "Merged") return MERGED_COLOR;
-  return TRIBE_COLORS[tribe] || "#666";
+  return tribeColors[tribe] || "#666";
 }
 function normEliminated(eliminated) {
   return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
@@ -15,7 +15,7 @@ function isElim(eliminated, name) {
 }
 
 export default function ScoringTab({ eventForm, setEventForm }) {
-  const { appState, addEvent: addEventCtx, removeEvent, eliminated, getEffectiveTribe } = useLeague();
+  const { appState, addEvent: addEventCtx, removeEvent, eliminated, getEffectiveTribe, contestants, tribeColors } = useLeague();
 
   const addEvent = () => addEventCtx(eventForm).then(() => setEventForm({ ...eventForm, contestants: [], event: "" }));
   return (
@@ -38,18 +38,18 @@ export default function ScoringTab({ eventForm, setEventForm }) {
         <div style={S.formRow}>
           <label style={S.formLabel}>Contestants ({eventForm.contestants.length} selected — tap to select/deselect)</label>
           <div style={S.contestantPicker}>
-            {CONTESTANTS.filter(c => !isElim(eliminated, c.name)).map(c => {
+            {contestants.filter(c => !isElim(eliminated, c.name)).map(c => {
               const sel = eventForm.contestants.includes(c.name);
               return (
                 <button key={c.name} onClick={() => setEventForm({ ...eventForm, contestants: sel ? eventForm.contestants.filter(x => x !== c.name) : [...eventForm.contestants, c.name] })}
-                  style={{ ...S.contestantChip, background: sel ? tribeColor(getEffectiveTribe(c.name)) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(getEffectiveTribe(c.name)) : "rgba(255,255,255,0.1)", fontWeight: sel ? 700 : 400 }}>
+                  style={{ ...S.contestantChip, background: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.1)", fontWeight: sel ? 700 : 400 }}>
                   {c.name}
                 </button>
               );
             })}
             {normEliminated(eliminated).length > 0 && (<>
               <div style={{ width: "100%", borderTop: "1px solid rgba(255,255,255,0.06)", margin: "6px 0" }}/>
-              {CONTESTANTS.filter(c => isElim(eliminated, c.name)).map(c => {
+              {contestants.filter(c => isElim(eliminated, c.name)).map(c => {
                 const sel = eventForm.contestants.includes(c.name);
                 return (
                   <button key={c.name} onClick={() => setEventForm({ ...eventForm, contestants: sel ? eventForm.contestants.filter(x => x !== c.name) : [...eventForm.contestants, c.name] })}
