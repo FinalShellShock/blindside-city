@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { S, globalStyles } from "../../styles/theme.js";
-import { TorchIcon } from "../shared/Icons.jsx";
 import FireParticles from "../shared/FireParticles.jsx";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
@@ -56,7 +55,7 @@ export default function JoinCreateLeague({ firebaseUid, currentUser, displayName
       <FireParticles />
       <div style={{ ...S.loginCard, maxWidth: 440 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <TorchIcon size={48} />
+          <img src="/logo.png" alt="Blindside Island" style={{ height: 80, marginBottom: 8 }}/>
           <h1 style={S.title}>BLINDSIDE ISLAND</h1>
           <p style={S.subtitle}>Welcome, {displayName}</p>
         </div>
