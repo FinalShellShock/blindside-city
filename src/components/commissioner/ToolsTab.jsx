@@ -32,7 +32,9 @@ export default function ToolsTab({ currentUser, setView }) {
   const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, contestants, tribeColors } = useLeague();
   const [copied, setCopied] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);
-  const [customDraft, setCustomDraft] = useState({ label: "", points: 5 });
+  // custom rules: editingId = which custom rule's name is being edited inline
+  const [editingId, setEditingId] = useState(null);
+  const [editingLabel, setEditingLabel] = useState("");
 
   const handleCopyCode = () => {
     if (!appState?.inviteCode) return;
@@ -178,11 +180,15 @@ export default function ToolsTab({ currentUser, setView }) {
         </div>
       </div>
 
-      {/* Scoring Rules */}
+      {/* Scoring Rules — unified built-in + custom */}
       <div style={S.card}>
         <h2 style={S.cardTitle}>Scoring Rules</h2>
-        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>Adjust point values for your league. Changes apply to all scoring immediately.</p>
+        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
+          Adjust point values or add custom rules. Changes apply to all scoring immediately.
+        </p>
         <div style={{ display: "grid", gap: 6 }}>
+
+          {/* ── Built-in rules ── */}
           {Object.entries(SCORING_RULES).map(([key, rule]) => {
             const current = (appState.scoringRules || {})[key] !== undefined
               ? (appState.scoringRules || {})[key]
@@ -193,7 +199,7 @@ export default function ToolsTab({ currentUser, setView }) {
                 <span style={{ flex: 1, color: "#E8D5B5", fontSize: 14 }}>{rule.label}</span>
                 {isModified && <span style={{ fontSize: 11, color: "#A89070" }}>default: {rule.points > 0 ? "+" : ""}{rule.points}</span>}
                 <button onClick={() => {
-                  const overrides = { ...(appState.scoringRules || {}), [key]: Math.max(-20, current - 1) };
+                  const overrides = { ...(appState.scoringRules || {}), [key]: Math.max(-50, current - 1) };
                   saveState({ ...appState, scoringRules: overrides });
                 }} style={{ ...S.smallBtnGhost, padding: "2px 8px", fontSize: 16, lineHeight: 1 }}>−</button>
                 <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: current >= 0 ? "#4ADE80" : "#F87171", minWidth: 36, textAlign: "center" }}>
@@ -213,97 +219,94 @@ export default function ToolsTab({ currentUser, setView }) {
               </div>
             );
           })}
-        </div>
-        {Object.keys(appState.scoringRules || {}).length > 0 && (
-          <button style={{ ...S.smallBtnGhost, marginTop: 12, fontSize: 12 }} onClick={() => saveState({ ...appState, scoringRules: {} })}>
-            Reset All to Defaults
-          </button>
-        )}
-      </div>
 
-      {/* Custom Scoring Rules */}
-      <div style={S.card}>
-        <h2 style={S.cardTitle}>Custom Scoring Rules</h2>
-        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
-          Add league-specific rules. Custom rules appear alongside built-in rules when recording events.
-        </p>
-
-        {/* Existing custom rules */}
-        {(appState.customRules || []).length > 0 && (
-          <div style={{ display: "grid", gap: 6, marginBottom: 16 }}>
-            {(appState.customRules || []).map(rule => {
-              const inUse = (appState.episodes || []).some(ep =>
-                (ep.events || []).some(ev => ev.type === rule.id)
-              );
-              return (
-                <div key={rule.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+          {/* ── Custom rules ── */}
+          {(appState.customRules || []).map(rule => {
+            const inUse = (appState.episodes || []).some(ep =>
+              (ep.events || []).some(ev => ev.type === rule.id)
+            );
+            const isEditing = editingId === rule.id;
+            return (
+              <div key={rule.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(255,140,66,0.04)", borderRadius: 8, border: "1px solid rgba(255,140,66,0.15)" }}>
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    style={{ ...S.input, flex: 1, padding: "4px 8px", fontSize: 14, marginBottom: 0 }}
+                    value={editingLabel}
+                    onChange={e => setEditingLabel(e.target.value)}
+                    onBlur={() => {
+                      if (editingLabel.trim()) {
+                        const updated = (appState.customRules || []).map(r => r.id === rule.id ? { ...r, label: editingLabel.trim() } : r);
+                        saveState({ ...appState, customRules: updated });
+                      }
+                      setEditingId(null);
+                    }}
+                    onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setEditingId(null); } }}
+                    maxLength={60}
+                  />
+                ) : (
                   <span style={{ flex: 1, color: "#E8D5B5", fontSize: 14 }}>{rule.label}</span>
-                  <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: rule.points >= 0 ? "#4ADE80" : "#F87171", minWidth: 36, textAlign: "center" }}>
-                    {rule.points > 0 ? "+" : ""}{rule.points}
-                  </span>
-                  {inUse
-                    ? <span style={{ fontSize: 11, color: "#A89070", padding: "2px 6px" }}>in use</span>
-                    : (
-                      <button
-                        style={{ ...S.removeBtn, fontSize: 12, padding: "2px 8px" }}
-                        onClick={() => {
-                          const updated = (appState.customRules || []).filter(r => r.id !== rule.id);
-                          saveState({ ...appState, customRules: updated });
-                        }}
-                      >✕ Delete</button>
-                    )
-                  }
-                </div>
-              );
-            })}
-          </div>
-        )}
+                )}
+                {!isEditing && (
+                  <button
+                    title="Edit name"
+                    onClick={() => { setEditingId(rule.id); setEditingLabel(rule.label); }}
+                    style={{ ...S.smallBtnGhost, padding: "2px 6px", fontSize: 13, color: "#A89070" }}
+                  >✎</button>
+                )}
+                <button onClick={() => {
+                  const updated = (appState.customRules || []).map(r => r.id === rule.id ? { ...r, points: Math.max(-50, r.points - 1) } : r);
+                  saveState({ ...appState, customRules: updated });
+                }} style={{ ...S.smallBtnGhost, padding: "2px 8px", fontSize: 16, lineHeight: 1 }}>−</button>
+                <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: rule.points >= 0 ? "#4ADE80" : "#F87171", minWidth: 36, textAlign: "center" }}>
+                  {rule.points > 0 ? "+" : ""}{rule.points}
+                </span>
+                <button onClick={() => {
+                  const updated = (appState.customRules || []).map(r => r.id === rule.id ? { ...r, points: Math.min(50, r.points + 1) } : r);
+                  saveState({ ...appState, customRules: updated });
+                }} style={{ ...S.smallBtnGhost, padding: "2px 8px", fontSize: 16, lineHeight: 1 }}>+</button>
+                {inUse
+                  ? <span style={{ fontSize: 11, color: "#A89070", padding: "2px 6px", minWidth: 44 }}>in use</span>
+                  : <button
+                      style={{ ...S.removeBtn, fontSize: 12, padding: "2px 8px" }}
+                      onClick={() => {
+                        const updated = (appState.customRules || []).filter(r => r.id !== rule.id);
+                        saveState({ ...appState, customRules: updated });
+                      }}
+                    >✕</button>
+                }
+              </div>
+            );
+          })}
 
-        {/* Add new custom rule */}
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 2, minWidth: 160 }}>
-            <label style={S.formLabel}>Rule Name</label>
-            <input
-              style={S.input}
-              placeholder="e.g. Finds Hidden Immunity Idol"
-              value={customDraft.label}
-              onChange={e => setCustomDraft(d => ({ ...d, label: e.target.value }))}
-              maxLength={60}
-            />
-          </div>
-          <div style={{ minWidth: 120 }}>
-            <label style={S.formLabel}>Points</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button
-                style={{ ...S.smallBtnGhost, padding: "2px 10px", fontSize: 18, lineHeight: 1 }}
-                onClick={() => setCustomDraft(d => ({ ...d, points: Math.max(-50, d.points - 1) }))}
-              >−</button>
-              <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: customDraft.points >= 0 ? "#4ADE80" : "#F87171", minWidth: 36, textAlign: "center" }}>
-                {customDraft.points > 0 ? "+" : ""}{customDraft.points}
-              </span>
-              <button
-                style={{ ...S.smallBtnGhost, padding: "2px 10px", fontSize: 18, lineHeight: 1 }}
-                onClick={() => setCustomDraft(d => ({ ...d, points: Math.min(50, d.points + 1) }))}
-              >+</button>
-            </div>
-          </div>
+          {/* ── Add Custom Rule row ── */}
           <button
-            style={{ ...S.primaryBtn, opacity: customDraft.label.trim() ? 1 : 0.4 }}
-            disabled={!customDraft.label.trim()}
             onClick={() => {
-              const newRule = {
-                id: `custom_${Date.now()}`,
-                label: customDraft.label.trim(),
-                points: customDraft.points,
-              };
+              const newRule = { id: `custom_${Date.now()}`, label: "New Custom Rule", points: 5 };
               const updated = [...(appState.customRules || []), newRule];
-              saveState({ ...appState, customRules: updated });
-              setCustomDraft({ label: "", points: 5 });
+              saveState({ ...appState, customRules: updated }).then(() => {
+                setEditingId(newRule.id);
+                setEditingLabel(newRule.label);
+              });
             }}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "transparent", border: "1px dashed rgba(255,140,66,0.3)", borderRadius: 8, cursor: "pointer", color: "#FF8C42", fontSize: 14, fontFamily: "'Crimson Pro',serif", width: "100%", textAlign: "left" }}
           >
-            Add Rule
+            + Add Custom Rule
           </button>
+
         </div>
+
+        {/* Reset to defaults */}
+        <button
+          style={{ ...S.smallBtnGhost, marginTop: 12, fontSize: 12 }}
+          onClick={() => {
+            if (confirm("Reset all point values to defaults and delete all custom rules?")) {
+              saveState({ ...appState, scoringRules: {}, customRules: [] });
+            }
+          }}
+        >
+          Reset to Defaults
+        </button>
       </div>
 
       {/* Invite Code */}
