@@ -254,6 +254,16 @@ export default function ToolsTab({ currentUser, setView }) {
                     style={{ ...S.smallBtnGhost, padding: "2px 6px", fontSize: 13, color: "#A89070" }}
                   >✎</button>
                 )}
+                {inUse
+                  ? <span style={{ fontSize: 11, color: "#A89070", padding: "2px 6px", minWidth: 44 }}>in use</span>
+                  : <button
+                      style={{ ...S.removeBtn, fontSize: 12, padding: "2px 8px" }}
+                      onClick={() => {
+                        const updated = (appState.customRules || []).filter(r => r.id !== rule.id);
+                        saveState({ ...appState, customRules: updated });
+                      }}
+                    >✕</button>
+                }
                 <button onClick={() => {
                   const updated = (appState.customRules || []).map(r => r.id === rule.id ? { ...r, points: Math.max(-50, r.points - 1) } : r);
                   saveState({ ...appState, customRules: updated });
@@ -265,16 +275,6 @@ export default function ToolsTab({ currentUser, setView }) {
                   const updated = (appState.customRules || []).map(r => r.id === rule.id ? { ...r, points: Math.min(50, r.points + 1) } : r);
                   saveState({ ...appState, customRules: updated });
                 }} style={{ ...S.smallBtnGhost, padding: "2px 8px", fontSize: 16, lineHeight: 1 }}>+</button>
-                {inUse
-                  ? <span style={{ fontSize: 11, color: "#A89070", padding: "2px 6px", minWidth: 44 }}>in use</span>
-                  : <button
-                      style={{ ...S.removeBtn, fontSize: 12, padding: "2px 8px" }}
-                      onClick={() => {
-                        const updated = (appState.customRules || []).filter(r => r.id !== rule.id);
-                        saveState({ ...appState, customRules: updated });
-                      }}
-                    >✕</button>
-                }
               </div>
             );
           })}
