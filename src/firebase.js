@@ -170,14 +170,16 @@ export async function makeDraftPick(leagueId, draftState, userId, contestantName
   const picks = [...draftState.picks, pick];
   const currentPick = draftState.currentPick + 1;
   const done = currentPick >= draftState.order.length;
-  await setDoc(draftDoc(leagueId), {
+  const newState = {
     ...draftState,
     picks,
     currentPick,
     lastPickAt: Date.now(),
     status: done ? 'completed' : 'active',
-  });
-  return done;
+  };
+  await setDoc(draftDoc(leagueId), newState);
+  // Return the fully-updated state so callers can finalize with complete picks
+  return done ? newState : null;
 }
 
 export async function resetDraft(leagueId) {

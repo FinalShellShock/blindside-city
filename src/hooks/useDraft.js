@@ -68,19 +68,21 @@ export function useDraft(currentUser) {
     if (!isMyTurn) return;
     if (!availableContestants.length) return;
     const random = availableContestants[Math.floor(Math.random() * availableContestants.length)];
-    fbMakePick(currentLeagueId, draftState, currentUser, random.name).then((done) => {
-      if (done) finalizeDraft(draftState);
+    fbMakePick(currentLeagueId, draftState, currentUser, random.name).then((finalState) => {
+      if (finalState) finalizeDraft(finalState);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRemaining]);
 
   const makePick = useCallback(async (contestantName) => {
     if (!isMyTurn || !draftState) return;
-    const done = await fbMakePick(currentLeagueId, draftState, currentUser, contestantName);
-    if (done) await finalizeDraft(draftState);
+    const finalState = await fbMakePick(currentLeagueId, draftState, currentUser, contestantName);
+    if (finalState) await finalizeDraft(finalState);
   }, [isMyTurn, draftState, currentLeagueId, currentUser]);
 
-  // When draft completes: create/update teams in appState based on picks
+  // When draft completes: create/update teams in appState based on picks.
+  // Accepts the fully-updated draft state (including the final pick) to avoid
+  // stale-closure bugs where the last pick hasn't propagated to local state yet.
   const finalizeDraft = useCallback(async (finalDraftState) => {
     const allPicks = [...(finalDraftState.picks)];
     // Group picks by userId
@@ -90,16 +92,18 @@ export function useDraft(currentUser) {
       byUser[p.userId].push(p.contestant);
     });
     // Build teams: one per drafter. Use existing team name if present, else displayName + "'s Team"
-    const teams = { ...(appState?.teams || {}) };
+    // Read appState fresh from the ref to avoid stale closure
+    const currentAppState = appState;
+    const teams = { ...(currentAppState?.teams || {}) };
     Object.entries(byUser).forEach(([uid, members]) => {
-      const displayName = appState?.users?.[uid]?.displayName || uid;
+      const displayName = currentAppState?.users?.[uid]?.displayName || uid;
       // Find existing team owned by this user, or create a new key
       const existingEntry = Object.entries(teams).find(([, t]) => t.owner === uid);
       const teamKey = existingEntry ? existingEntry[0] : `${displayName}'s Team`;
       if (existingEntry) delete teams[existingEntry[0]];
       teams[teamKey] = { owner: uid, members, motto: existingEntry?.[1]?.motto || "" };
     });
-    await saveState({ ...appState, teams, draftStatus: 'completed' });
+    await saveState({ ...currentAppState, teams, draftStatus: 'completed' });
   }, [appState, saveState]);
 
   // Per-user pick roster (for the sidebar)

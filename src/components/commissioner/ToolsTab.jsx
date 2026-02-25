@@ -2,6 +2,7 @@ import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { DEFAULT_STATE, SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
+import { resetDraft } from "../../firebase.js";
 
 const STOCK_LOGOS = [
   { id: "torch",    label: "Torch",    url: "/logos/logo-torch.jpg" },
@@ -29,7 +30,7 @@ function isElim(eliminated, name) {
 }
 
 export default function ToolsTab({ currentUser, setView }) {
-  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, contestants, tribeColors } = useLeague();
+  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, contestants, tribeColors, currentLeagueId } = useLeague();
   const [copied, setCopied] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);
   // custom rules: editingId = which custom rule's name is being edited inline
@@ -105,8 +106,12 @@ export default function ToolsTab({ currentUser, setView }) {
             <button style={{ ...S.smallBtn }} onClick={() => setView("draft")}>Go to Draft Board</button>
             <button
               style={{ ...S.smallBtnGhost, fontSize: 12, color: "#F87171", borderColor: "rgba(248,113,113,0.3)" }}
-              onClick={() => { if (confirm("Reset draft back to lobby? The draft will need to be restarted.")) saveState({ ...appState, draftStatus: 'pending' }); }}
-            >Reset to Lobby</button>
+              onClick={async () => {
+                if (!confirm("Cancel the draft? All picks will be discarded and the draft will be removed entirely.")) return;
+                await resetDraft(currentLeagueId);
+                await saveState({ ...appState, draftStatus: 'not_started' });
+              }}
+            >Cancel Draft</button>
           </div>
         ) : appState.draftStatus === 'pending' ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

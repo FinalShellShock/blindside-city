@@ -167,9 +167,17 @@ function App() {
             {label}
           </button>
         ))}
-        {/* Draft tab — visible to all when a draft is pending or active */}
+        {/* Draft tab — visible to all when a draft is pending/active/completed */}
         {["pending", "active", "completed"].includes(appState?.draftStatus) && (
-          <button onClick={() => setView("draft")} style={{ ...S.navBtn, ...(view === "draft" ? S.navBtnActive : {}), color: appState?.draftStatus === "active" ? "#FFD93D" : undefined }}>
+          <button
+            onClick={() => setView("draft")}
+            style={{
+              ...S.navBtn,
+              ...(view === "draft" ? S.navBtnActive : {}),
+              // Only override color when draft is active (yellow dot) and tab is NOT currently selected
+              ...(appState?.draftStatus === "active" && view !== "draft" ? { color: "#FFD93D" } : {}),
+            }}
+          >
             {appState?.draftStatus === "active" ? "● Draft" : "Draft"}
           </button>
         )}

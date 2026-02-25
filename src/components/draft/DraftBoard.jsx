@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 import { useDraft } from "../../hooks/useDraft.js";
@@ -23,6 +24,9 @@ export default function DraftBoard({ currentUser, isCommissioner }) {
     rosterByUser,
     picksPerPlayer,
   } = useDraft(currentUser);
+
+  // "rosters" | "rounds"
+  const [sidebarTab, setSidebarTab] = useState("rosters");
 
   if (draftLoading) return (
     <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
@@ -73,6 +77,16 @@ export default function DraftBoard({ currentUser, isCommissioner }) {
     await saveState({ ...appState, draftStatus: 'pending' });
   };
 
+  // Build round-by-round data from picks
+  const rounds = [];
+  if (draftState.picks?.length) {
+    draftState.picks.forEach((pick, idx) => {
+      const roundIdx = Math.floor(idx / totalPlayers);
+      if (!rounds[roundIdx]) rounds[roundIdx] = [];
+      rounds[roundIdx].push(pick);
+    });
+  }
+
   return (
     <div>
       {/* ── Status banner ── */}
@@ -116,14 +130,14 @@ export default function DraftBoard({ currentUser, isCommissioner }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 16, alignItems: "start" }}>
+      <div className="draft-board-grid">
 
         {/* ── Available contestants grid ── */}
         <div style={S.card}>
           <h2 style={{ ...S.cardTitle, marginBottom: 16 }}>
             {isDone ? "All Contestants" : "Available Contestants"}
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
             {contestants.map(c => {
               const isPicked = !availableContestants.find(a => a.name === c.name);
               const tribe = getEffectiveTribe(c.name);
@@ -170,39 +184,100 @@ export default function DraftBoard({ currentUser, isCommissioner }) {
           </div>
         </div>
 
-        {/* ── Picks sidebar ── */}
+        {/* ── Picks sidebar with tabs ── */}
         <div style={S.card}>
-          <h2 style={{ ...S.cardTitle, fontSize: 16, marginBottom: 12 }}>Rosters</h2>
-          {Object.entries(users).map(([uid, u]) => {
-            const picks = rosterByUser[uid] || [];
-            const isCurrentPicker = uid === currentPickUserId && !isDone;
-            return (
-              <div key={uid} style={{ marginBottom: 16 }}>
-                <p style={{ fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: 700, color: isCurrentPicker ? "#FF8C42" : "#E8D5B5", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                  {isCurrentPicker && <span>⭐</span>}
-                  {u.displayName}
-                  <span style={{ fontSize: 11, color: "#A89070", fontFamily: "'Crimson Pro',serif", fontWeight: 400 }}>
-                    {picks.length}/{picksPerPlayer}
-                  </span>
-                </p>
-                {picks.length === 0 ? (
-                  <p style={{ color: "#555", fontSize: 12, paddingLeft: 4 }}>No picks yet</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {picks.map(name => {
-                      const tribe = getEffectiveTribe(name);
-                      const color = tribeColor(tribeColors, tribe);
-                      return (
-                        <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", background: "rgba(255,255,255,0.03)", borderRadius: 6, borderLeft: `3px solid ${color}` }}>
-                          <span style={{ fontSize: 13, color: "#E8D5B5" }}>{name}</span>
-                        </div>
-                      );
-                    })}
+          {/* Tab row */}
+          <div style={{ display: "flex", gap: 0, marginBottom: 16, borderRadius: 6, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)" }}>
+            {[
+              { id: "rosters", label: "Rosters" },
+              { id: "rounds",  label: "By Round" },
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setSidebarTab(t.id)}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  border: "none",
+                  background: sidebarTab === t.id ? "rgba(255,140,66,0.15)" : "transparent",
+                  color: sidebarTab === t.id ? "#FF8C42" : "#A89070",
+                  fontFamily: "'Cinzel',serif",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Rosters tab ── */}
+          {sidebarTab === "rosters" && (
+            <div>
+              {Object.entries(users).map(([uid, u]) => {
+                const picks = rosterByUser[uid] || [];
+                const isCurrentPicker = uid === currentPickUserId && !isDone;
+                return (
+                  <div key={uid} style={{ marginBottom: 16 }}>
+                    <p style={{ fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: 700, color: isCurrentPicker ? "#FF8C42" : "#E8D5B5", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      {isCurrentPicker && <span>⭐</span>}
+                      {u.displayName}
+                      <span style={{ fontSize: 11, color: "#A89070", fontFamily: "'Crimson Pro',serif", fontWeight: 400 }}>
+                        {picks.length}/{picksPerPlayer}
+                      </span>
+                    </p>
+                    {picks.length === 0 ? (
+                      <p style={{ color: "#555", fontSize: 12, paddingLeft: 4 }}>No picks yet</p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {picks.map(name => {
+                          const tribe = getEffectiveTribe(name);
+                          const color = tribeColor(tribeColors, tribe);
+                          return (
+                            <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", background: "rgba(255,255,255,0.03)", borderRadius: 6, borderLeft: `3px solid ${color}` }}>
+                              <span style={{ fontSize: 13, color: "#E8D5B5" }}>{name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── By Round tab ── */}
+          {sidebarTab === "rounds" && (
+            <div>
+              {rounds.length === 0 ? (
+                <p style={{ color: "#555", fontSize: 13 }}>No picks yet.</p>
+              ) : (
+                rounds.map((roundPicks, ri) => (
+                  <div key={ri} style={{ marginBottom: 16 }}>
+                    <p style={{ fontFamily: "'Cinzel',serif", fontSize: 12, color: "#A89070", letterSpacing: 1, marginBottom: 6 }}>
+                      ROUND {ri + 1}
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {roundPicks.map((pick, pi) => {
+                        const tribe = getEffectiveTribe(pick.contestant);
+                        const color = tribeColor(tribeColors, tribe);
+                        const pickerName = users[pick.userId]?.displayName || pick.userId;
+                        return (
+                          <div key={pi} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", background: "rgba(255,255,255,0.03)", borderRadius: 6, borderLeft: `3px solid ${color}` }}>
+                            <div style={{ flex: 1 }}>
+                              <p style={{ fontSize: 13, color: "#E8D5B5", lineHeight: 1.2 }}>{pick.contestant}</p>
+                              <p style={{ fontSize: 11, color: "#A89070" }}>{pickerName}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
       </div>
