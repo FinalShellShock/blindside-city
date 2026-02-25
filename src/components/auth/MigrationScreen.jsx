@@ -3,6 +3,8 @@ import { S, globalStyles } from "../../styles/theme.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { TorchIcon } from "../shared/Icons.jsx";
 import FireParticles from "../shared/FireParticles.jsx";
+import { loadState, db } from "../../firebase.js";
+import { doc, setDoc } from "firebase/firestore";
 
 // Shown when a user has a bc_user localStorage key but no Firebase Auth session.
 // They created their account in the old Blindside City system and need to migrate.
@@ -14,6 +16,22 @@ export default function MigrationScreen({ legacyUsername, legacyDisplayName, onC
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // After creating the Firebase account, wire up the legacy league (leagues/main)
+  // into the user's profile so the app knows which league to load.
+  const wireLegacyLeague = async (uid) => {
+    try {
+      const leagueData = await loadState('main');
+      const leagueName = leagueData?.leagueName || 'Fantasy Survivor 50';
+      const isCommissioner = (leagueData?.commissioners || []).includes(legacyUsername);
+      await setDoc(doc(db, 'users', uid), {
+        leagues: [{ id: 'main', name: leagueName, role: isCommissioner ? 'commissioner' : 'member' }],
+      }, { merge: true });
+    } catch (e) {
+      // Non-fatal — user can still use the app, just won't auto-load the league
+      console.warn('Could not wire legacy league:', e);
+    }
+  };
+
   const handleMigrate = async () => {
     setError("");
     if (!email.trim()) { setError("Enter your email"); return; }
@@ -21,7 +39,8 @@ export default function MigrationScreen({ legacyUsername, legacyDisplayName, onC
     if (password !== confirm) { setError("Passwords don't match"); return; }
     setLoading(true);
     try {
-      await signUp(email.trim(), password, legacyDisplayName, legacyUsername);
+      const cred = await signUp(email.trim(), password, legacyDisplayName, legacyUsername);
+      await wireLegacyLeague(cred.user.uid);
       localStorage.removeItem("bc_user");
       onComplete();
     } catch (e) {
@@ -34,7 +53,8 @@ export default function MigrationScreen({ legacyUsername, legacyDisplayName, onC
     setError("");
     setLoading(true);
     try {
-      await signInGoogle(legacyDisplayName, legacyUsername);
+      const cred = await signInGoogle(legacyDisplayName, legacyUsername);
+      await wireLegacyLeague(cred.user.uid);
       localStorage.removeItem("bc_user");
       onComplete();
     } catch (e) {
