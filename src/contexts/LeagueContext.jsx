@@ -37,6 +37,9 @@ export function LeagueProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // Don't load league data until we've confirmed the correct league ID
+    // via refreshUserLeagues — prevents briefly loading a stale/wrong league.
+    if (!leaguesLoaded) return;
     let unsubscribe;
     async function init() {
       try {
@@ -53,7 +56,7 @@ export function LeagueProvider({ children }) {
     setAppState(null);
     init();
     return () => { if (unsubscribe) unsubscribe(); };
-  }, [currentLeagueId]);
+  }, [currentLeagueId, leaguesLoaded]);
 
   const saveState = useCallback(async (ns) => {
     setAppState(ns);
