@@ -208,7 +208,19 @@ function App() {
         )}
       </nav>
 
-      {showAccount && <AccountPanel onClose={() => setShowAccount(false)} />}
+      {showAccount && (
+        <AccountPanel
+          onClose={() => setShowAccount(false)}
+          onSave={async ({ displayName: dn, avatar }) => {
+            if (!currentUser || !appState?.users?.[currentUser]) return;
+            const updatedUsers = {
+              ...appState.users,
+              [currentUser]: { ...appState.users[currentUser], displayName: dn, avatar },
+            };
+            await saveState({ ...appState, users: updatedUsers });
+          }}
+        />
+      )}
 
       <main style={S.main}>
         {devMode && (

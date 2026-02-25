@@ -4,7 +4,7 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 
 const STOCK_AVATARS = Array.from({ length: 8 }, (_, i) => `/avatars/avatar${i + 1}.png`);
 
-export default function AccountPanel({ onClose }) {
+export default function AccountPanel({ onClose, onSave }) {
   const { userProfile, updateProfile } = useAuth();
 
   const [displayName, setDisplayName] = useState(userProfile?.displayName || "");
@@ -22,10 +22,9 @@ export default function AccountPanel({ onClose }) {
   async function handleSave() {
     if (!displayName.trim()) return;
     setSaving(true);
-    await updateProfile({
-      displayName: displayName.trim(),
-      avatar: effectiveAvatar,
-    });
+    const updates = { displayName: displayName.trim(), avatar: effectiveAvatar };
+    await updateProfile(updates);
+    if (onSave) await onSave(updates);
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

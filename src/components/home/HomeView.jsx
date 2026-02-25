@@ -37,9 +37,13 @@ export default function HomeView({ currentUser, myTeam }) {
                 const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
                 return (
                   <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,140,66,0.15)", border: "1px solid rgba(255,140,66,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: 700, color: "#FF8C42", flexShrink: 0 }}>
-                      {initials}
-                    </div>
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,140,66,0.25)", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,140,66,0.15)", border: "1px solid rgba(255,140,66,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: 700, color: "#FF8C42", flexShrink: 0 }}>
+                        {initials}
+                      </div>
+                    )}
                     <span style={{ color: "#E8D5B5", fontSize: 15 }}>{name}</span>
                   </div>
                 );
