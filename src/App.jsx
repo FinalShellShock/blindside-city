@@ -36,7 +36,7 @@ export function elimEpisode(eliminated, name) {
 
 function App() {
   const devMode = useDevMode();
-  const { firebaseUser, userProfile, loading: authLoading, logOut, updateProfile } = useAuth();
+  const { firebaseUser, userProfile, loading: authLoading, updateProfile } = useAuth();
   const { appState, loading: dataLoading, saveState, effectiveScoringRules, currentLeagueId, refreshUserLeagues, userLeagues, leaguesLoaded } = useLeague();
 
   const [view, setView] = useState("home");
@@ -182,10 +182,6 @@ function App() {
             title="Help"
             style={{ background: "none", border: "1px solid rgba(255,140,66,0.35)", borderRadius: "50%", width: 22, height: 22, color: "#A89070", fontSize: 12, cursor: "pointer", fontFamily: "'Cinzel',serif", fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
           >?</button>
-          <button style={S.logoutBtn} onClick={async () => {
-            localStorage.removeItem("bc_user");
-            await logOut();
-          }}>Logout</button>
         </div>
       </header>
 

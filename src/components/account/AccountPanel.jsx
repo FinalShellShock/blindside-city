@@ -5,7 +5,7 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 const STOCK_AVATARS = Array.from({ length: 8 }, (_, i) => `/avatars/avatar${i + 1}.png`);
 
 export default function AccountPanel({ onClose, onSave }) {
-  const { userProfile, updateProfile } = useAuth();
+  const { userProfile, updateProfile, logOut } = useAuth();
 
   const [displayName, setDisplayName] = useState(userProfile?.displayName || "");
   const [selectedAvatar, setSelectedAvatar] = useState(userProfile?.avatar || "");
@@ -121,6 +121,18 @@ export default function AccountPanel({ onClose, onSave }) {
           disabled={saving || !displayName.trim()}
         >
           {saving ? "Saving..." : saved ? "✓ Saved!" : "Save Changes"}
+        </button>
+
+        {/* Logout */}
+        <button
+          style={{ ...S.logoutBtn, width: "100%", marginTop: 12, justifyContent: "center", textAlign: "center" }}
+          onClick={async () => {
+            localStorage.removeItem("bc_user");
+            await logOut();
+            onClose();
+          }}
+        >
+          Logout
         </button>
       </div>
     </div>
