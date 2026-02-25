@@ -100,9 +100,13 @@ export default function ToolsTab({ currentUser, setView }) {
             >Reset Draft</button>
           </div>
         ) : appState.draftStatus === 'active' ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={{ color: "#FF8C42", fontFamily: "'Cinzel',serif", fontSize: 14 }}>● Draft in progress</span>
             <button style={{ ...S.smallBtn }} onClick={() => setView("draft")}>Go to Draft Board</button>
+            <button
+              style={{ ...S.smallBtnGhost, fontSize: 12, color: "#F87171", borderColor: "rgba(248,113,113,0.3)" }}
+              onClick={() => { if (confirm("Reset draft back to lobby? The draft will need to be restarted.")) saveState({ ...appState, draftStatus: 'pending' }); }}
+            >Reset to Lobby</button>
           </div>
         ) : appState.draftStatus === 'pending' ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
