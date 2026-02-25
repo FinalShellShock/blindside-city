@@ -18,10 +18,6 @@ const CHANGELOG = [
             body: "Click your name or avatar in the top-right to open your account settings. You can update your display name, pick from 8 Survivor-themed avatars, or paste in a custom image URL.",
           },
           {
-            label: "Your avatar is now visible to your league",
-            body: "Avatars show up on the Home standings card next to everyone's team name.",
-          },
-          {
             label: "Commissioner tooltips",
             body: "Every section in the Commissioner tab now has a ? tooltip explaining what it does.",
           },
