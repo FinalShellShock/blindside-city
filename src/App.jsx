@@ -173,7 +173,7 @@ function App() {
           <button
             onClick={() => setShowHelp(true)}
             title="Help"
-            style={{ ...S.logoutBtn, fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13 }}
+            style={{ background: "none", border: "1px solid rgba(255,140,66,0.35)", borderRadius: "50%", width: 22, height: 22, color: "#A89070", fontSize: 12, cursor: "pointer", fontFamily: "'Cinzel',serif", fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
           >?</button>
           <button style={S.logoutBtn} onClick={async () => {
             localStorage.removeItem("bc_user");

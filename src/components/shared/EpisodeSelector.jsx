@@ -15,9 +15,7 @@ export default function EpisodeSelector() {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <span style={{ fontSize: 11, color: "#A89070", fontFamily: "'Cinzel',serif", letterSpacing: 1, whiteSpace: "nowrap" }}>
-        👁 Spoiler Filter:
-      </span>
+      <span style={{ fontSize: 14, whiteSpace: "nowrap" }}>👁</span>
       <select
         value={watchedThrough}
         onChange={e => setWatchedThrough(parseInt(e.target.value, 10))}

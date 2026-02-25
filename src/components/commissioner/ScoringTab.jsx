@@ -1,5 +1,20 @@
+import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
+
+function Tip({ text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <button onClick={() => setOpen(o => !o)} style={{ background: "none", border: "1px solid rgba(255,140,66,0.3)", borderRadius: "50%", width: 18, height: 18, color: "#A89070", fontSize: 11, cursor: "pointer", fontFamily: "'Cinzel',serif", fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>?</button>
+      {open && (
+        <span onClick={() => setOpen(false)} style={{ position: "absolute", top: 24, left: 0, zIndex: 50, background: "rgba(26,15,5,0.98)", border: "1px solid rgba(255,140,66,0.25)", borderRadius: 8, padding: "10px 14px", width: 240, color: "#C8B89A", fontSize: 13, lineHeight: 1.5, boxShadow: "0 4px 20px rgba(0,0,0,0.5)", cursor: "default" }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 const MERGED_COLOR = "#FFD93D";
 function tribeColor(tribeColors, tribe) {
@@ -20,7 +35,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
   return (
     <div>
       <div style={S.card}>
-        <h2 style={S.cardTitle}>Update Scoring</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Update Scoring <Tip text="Log scoring events from each episode. Select the episode number, the event type, and the contestant(s) involved. Points are applied immediately and reflected in the scoreboard." /></h2>
         <div style={S.formRow}>
           <label style={S.formLabel}>Episode #</label>
           <input type="number" min="1" max="20" value={eventForm.episode} onChange={e => setEventForm({ ...eventForm, episode: parseInt(e.target.value) || 1 })} style={{ ...S.input, width: 80 }}/>
