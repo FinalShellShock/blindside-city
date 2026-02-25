@@ -19,6 +19,7 @@ import DraftLobby from "./components/draft/DraftLobby.jsx";
 import DraftBoard from "./components/draft/DraftBoard.jsx";
 import AccountPanel from "./components/account/AccountPanel.jsx";
 import HelpPanel from "./components/shared/HelpPanel.jsx";
+import ChangelogPanel from "./components/shared/ChangelogPanel.jsx";
 
 const STOCK_AVATARS = Array.from({ length: 8 }, (_, i) => `/avatars/avatar${i + 1}.png`);
 function randomAvatar() { return STOCK_AVATARS[Math.floor(Math.random() * STOCK_AVATARS.length)]; }
@@ -50,6 +51,7 @@ function App() {
   const [showJoinCreate, setShowJoinCreate] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   // The user key used in appState.users / appState.commissioners / appState.teams.
   // Migrated users keep their old username key; new Firebase users use their UID.
@@ -219,6 +221,7 @@ function App() {
       </nav>
 
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}
 
       {showAccount && (
         <AccountPanel
@@ -291,6 +294,12 @@ function App() {
         <p style={{ color: "#4A3828", fontSize: 12, fontFamily: "'Cinzel',serif", letterSpacing: 1 }}>
           © {new Date().getFullYear()} Blindside Island. All rights reserved.
         </p>
+        <button
+          onClick={() => setShowChangelog(true)}
+          style={{ background: "none", border: "none", color: "#4A3828", fontSize: 11, fontFamily: "'Cinzel',serif", letterSpacing: 1, cursor: "pointer", marginTop: 6, textDecoration: "underline", textDecorationColor: "#3A2818", padding: 0 }}
+        >
+          What's New
+        </button>
       </footer>
     </div>
   );
