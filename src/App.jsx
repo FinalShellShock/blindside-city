@@ -138,10 +138,7 @@ function App() {
       <header style={S.header}>
         <div style={S.headerLeft}>
           <TorchIcon size={28}/>
-          <div>
-            <LeagueSwitcher onJoinCreate={() => setShowJoinCreate(true)} />
-            <p style={S.headerSub}>Season 50</p>
-          </div>
+          <LeagueSwitcher onJoinCreate={() => setShowJoinCreate(true)} />
         </div>
         <div style={S.headerRight}>
           <EpisodeSelector/>
