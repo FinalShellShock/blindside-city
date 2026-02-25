@@ -39,7 +39,7 @@ export default function LoginScreen({ onSwitchToRegister }) {
       <FireParticles/>
       <div style={S.loginCard}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <img src="/logo.png" alt="Blindside Island" style={{ height: 80, marginBottom: 8 }}/>
+          <img src="/logo.png" alt="Blindside Island" style={{ width: "100%", maxWidth: 320, height: "auto", marginBottom: 8 }}/>
           <h1 style={S.title}>BLINDSIDE ISLAND</h1>
           <p style={S.subtitle}>SEASON 50 · IN THE HANDS OF THE FANS</p>
         </div>

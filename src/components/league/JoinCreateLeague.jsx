@@ -55,7 +55,7 @@ export default function JoinCreateLeague({ firebaseUid, currentUser, displayName
       <FireParticles />
       <div style={{ ...S.loginCard, maxWidth: 440 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <img src="/logo.png" alt="Blindside Island" style={{ height: 80, marginBottom: 8 }}/>
+          <img src="/logo.png" alt="Blindside Island" style={{ width: "100%", maxWidth: 320, height: "auto", marginBottom: 8 }}/>
           <h1 style={S.title}>BLINDSIDE ISLAND</h1>
           <p style={S.subtitle}>Welcome, {displayName}</p>
         </div>

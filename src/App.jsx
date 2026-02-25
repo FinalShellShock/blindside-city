@@ -137,7 +137,7 @@ function App() {
 
       <header style={S.header}>
         <div style={S.headerLeft}>
-          <img src="/logo.png" alt="Blindside Island" style={{ height: 52, width: "auto" }}/>
+          <img src="/logo.png" alt="Blindside Island" style={{ height: 52, width: 95, objectFit: "cover", objectPosition: "center" }}/>
           <LeagueSwitcher onJoinCreate={() => setShowJoinCreate(true)} />
         </div>
         <div style={S.headerRight}>
