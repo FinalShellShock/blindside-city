@@ -16,6 +16,8 @@ import CommissionerPanel from "./components/commissioner/CommissionerPanel.jsx";
 import EpisodeSelector from "./components/shared/EpisodeSelector.jsx";
 import LeagueSwitcher from "./components/shared/LeagueSwitcher.jsx";
 import JoinCreateLeague from "./components/league/JoinCreateLeague.jsx";
+import DraftLobby from "./components/draft/DraftLobby.jsx";
+import DraftBoard from "./components/draft/DraftBoard.jsx";
 
 // ── Elimination helpers (shared across the app) ──
 export function normEliminated(eliminated) {
@@ -165,6 +167,12 @@ function App() {
             {label}
           </button>
         ))}
+        {/* Draft tab — visible to all when a draft is pending or active */}
+        {["pending", "active", "completed"].includes(appState?.draftStatus) && (
+          <button onClick={() => setView("draft")} style={{ ...S.navBtn, ...(view === "draft" ? S.navBtnActive : {}), color: appState?.draftStatus === "active" ? "#FFD93D" : undefined }}>
+            {appState?.draftStatus === "active" ? "● Draft" : "Draft"}
+          </button>
+        )}
         {(isUserCommissioner || devMode) && (
           <button onClick={() => setView("admin")} style={{ ...S.navBtn, ...(view === "admin" ? S.navBtnActive : {}), color: "#FF6B35" }}>
             Commissioner
@@ -203,6 +211,12 @@ function App() {
               ))}
             </div>
           </div>
+        )}
+
+        {view === "draft" && (
+          appState?.draftStatus === "pending"
+            ? <DraftLobby currentUser={currentUser} isCommissioner={isUserCommissioner || devMode} />
+            : <DraftBoard currentUser={currentUser} isCommissioner={isUserCommissioner || devMode} />
         )}
 
         {view === "admin" && (isUserCommissioner || devMode) && (

@@ -81,6 +81,48 @@ export default function ToolsTab({ currentUser, setView }) {
 
   return (
     <div>
+      {/* Draft */}
+      <div style={S.card}>
+        <h2 style={S.cardTitle}>Draft</h2>
+        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
+          Run a snake draft to assign contestants to teams. Teams are created automatically when the draft completes. You can also skip drafting and assign teams manually below.
+        </p>
+        {appState.draftStatus === 'completed' ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ color: "#4ADE80", fontFamily: "'Cinzel',serif", fontSize: 14 }}>✓ Draft completed</span>
+            <button
+              style={{ ...S.smallBtnGhost, fontSize: 12 }}
+              onClick={() => setView("draft")}
+            >View Results</button>
+            <button
+              style={{ ...S.smallBtnGhost, fontSize: 12, color: "#F87171", borderColor: "rgba(248,113,113,0.3)" }}
+              onClick={() => { if (confirm("Reset the draft? Teams will not be changed.")) saveState({ ...appState, draftStatus: 'not_started' }); }}
+            >Reset Draft</button>
+          </div>
+        ) : appState.draftStatus === 'active' ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ color: "#FF8C42", fontFamily: "'Cinzel',serif", fontSize: 14 }}>● Draft in progress</span>
+            <button style={{ ...S.smallBtn }} onClick={() => setView("draft")}>Go to Draft Board</button>
+          </div>
+        ) : appState.draftStatus === 'pending' ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ color: "#FFD93D", fontFamily: "'Cinzel',serif", fontSize: 14 }}>● Draft lobby open</span>
+            <button style={{ ...S.smallBtn }} onClick={() => setView("draft")}>Go to Lobby</button>
+            <button
+              style={{ ...S.smallBtnGhost, fontSize: 12 }}
+              onClick={() => saveState({ ...appState, draftStatus: 'not_started' })}
+            >Cancel</button>
+          </div>
+        ) : (
+          <button
+            style={S.primaryBtn}
+            onClick={() => saveState({ ...appState, draftStatus: 'pending' })}
+          >
+            Open Draft Lobby
+          </button>
+        )}
+      </div>
+
       {/* Announcement */}
       <div style={S.card}>
         <h2 style={S.cardTitle}>League Announcement</h2>

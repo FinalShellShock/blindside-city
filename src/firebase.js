@@ -135,6 +135,55 @@ export async function getUserLeagues(uid) {
   return snap.exists() ? (snap.data().leagues || []) : [];
 }
 
+// ── Draft helpers (leagues/{leagueId}/draft/state) ──
+
+function draftDoc(leagueId) {
+  return doc(db, 'leagues', leagueId, 'draft', 'state');
+}
+
+export function subscribeToDraft(leagueId, callback) {
+  return onSnapshot(draftDoc(leagueId), (snap) => {
+    callback(snap.exists() ? snap.data() : null);
+  });
+}
+
+export async function startDraft(leagueId, { order, timerSeconds, picksPerPlayer }) {
+  await setDoc(draftDoc(leagueId), {
+    status: 'active',
+    order,           // full snake pick sequence e.g. [uid1,uid2,uid2,uid1] for 2 players 2 picks each
+    currentPick: 0,
+    picks: [],
+    timerSeconds,
+    picksPerPlayer,
+    startedAt: Date.now(),
+    lastPickAt: Date.now(),
+  });
+}
+
+export async function makeDraftPick(leagueId, draftState, userId, contestantName) {
+  const pick = {
+    userId,
+    contestant: contestantName,
+    pickNumber: draftState.currentPick,
+    timestamp: Date.now(),
+  };
+  const picks = [...draftState.picks, pick];
+  const currentPick = draftState.currentPick + 1;
+  const done = currentPick >= draftState.order.length;
+  await setDoc(draftDoc(leagueId), {
+    ...draftState,
+    picks,
+    currentPick,
+    lastPickAt: Date.now(),
+    status: done ? 'completed' : 'active',
+  });
+  return done;
+}
+
+export async function resetDraft(leagueId) {
+  await setDoc(draftDoc(leagueId), { status: 'reset' });
+}
+
 // ── Firebase Auth helpers ──
 export function subscribeToAuth(callback) {
   return onAuthStateChanged(auth, callback);
