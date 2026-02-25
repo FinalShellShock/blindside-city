@@ -273,7 +273,7 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Scoring Rules — unified built-in + custom */}
       <div style={S.card}>
-        <h2 style={S.cardTitle}>Scoring Rules</h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Scoring Rules <Tip text="Adjust point values for built-in events using the +/− buttons. Add custom rules for anything not covered (e.g. a special twist). Changes apply immediately to all scores." /></h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
           Adjust point values or add custom rules. Changes apply to all scoring immediately.
         </p>

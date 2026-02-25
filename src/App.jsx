@@ -146,15 +146,21 @@ function App() {
   // ── Main app ──
   return (
     <div style={S.appContainer}>
-      <style>{globalStyles}</style>
+      <style>{globalStyles + `
+        @media (max-width: 480px) {
+          .header-display-name { display: none !important; }
+          .header-logo { height: 36px !important; }
+          .header-right { gap: 8px !important; }
+        }
+      `}</style>
       <FireParticles/>
 
       <header style={S.header}>
         <div style={S.headerLeft}>
-          <img src="/logo.png" alt="Blindside Island" style={{ height: 52, width: "auto" }}/>
+          <img className="header-logo" src="/logo.png" alt="Blindside Island" style={{ height: 52, width: "auto" }}/>
           <LeagueSwitcher onJoinCreate={() => setShowJoinCreate(true)} />
         </div>
-        <div style={S.headerRight}>
+        <div className="header-right" style={S.headerRight}>
           <EpisodeSelector/>
           {userProfile?.avatar && (
             <img
@@ -165,6 +171,7 @@ function App() {
             />
           )}
           <span
+            className="header-display-name"
             style={{ ...S.userName, cursor: "pointer", textDecoration: "underline", textDecorationColor: "rgba(255,140,66,0.4)" }}
             onClick={() => setShowAccount(true)}
           >{displayName}</span>
