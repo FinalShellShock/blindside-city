@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { globalStyles, S } from "./styles/theme.js";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import { useLeague } from "./contexts/LeagueContext.jsx";
-import { TorchIcon } from "./components/shared/Icons.jsx";
 import FireParticles from "./components/shared/FireParticles.jsx";
 import DevPanel, { useDevMode } from "./components/shared/DevPanel.jsx";
 import LoginScreen from "./components/auth/LoginScreen.jsx";
@@ -67,7 +66,7 @@ function App() {
     return (
       <div style={S.loadingScreen}>
         <style>{globalStyles}</style>
-        <TorchIcon size={64}/>
+        <img src="/logo.png" alt="Blindside Island" style={{ height: 80 }}/>
         <p style={{ color: "#FF8C42", fontFamily: "'Cinzel',serif", marginTop: 16, fontSize: 18 }}>Loading...</p>
       </div>
     );
@@ -102,7 +101,7 @@ function App() {
         <FireParticles/>
         <div style={{ ...S.loginCard, maxWidth: 600 }}>
           <div style={{ textAlign: "center", marginBottom: 16 }}>
-            <TorchIcon size={48}/>
+            <img src="/logo.png" alt="Blindside Island" style={{ height: 80, marginBottom: 8 }}/>
             <h1 style={S.title}>BLINDSIDE ISLAND</h1>
             <p style={S.subtitle}>DEV MODE ACTIVE</p>
           </div>
@@ -138,7 +137,7 @@ function App() {
 
       <header style={S.header}>
         <div style={S.headerLeft}>
-          <TorchIcon size={28}/>
+          <img src="/logo.png" alt="Blindside Island" style={{ height: 32 }}/>
           <LeagueSwitcher onJoinCreate={() => setShowJoinCreate(true)} />
         </div>
         <div style={S.headerRight}>

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { S, globalStyles } from "../../styles/theme.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import { TorchIcon } from "../shared/Icons.jsx";
 import FireParticles from "../shared/FireParticles.jsx";
 
 export default function LoginScreen({ onSwitchToRegister }) {
@@ -40,7 +39,7 @@ export default function LoginScreen({ onSwitchToRegister }) {
       <FireParticles/>
       <div style={S.loginCard}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <TorchIcon size={48}/>
+          <img src="/logo.png" alt="Blindside Island" style={{ height: 80, marginBottom: 8 }}/>
           <h1 style={S.title}>BLINDSIDE ISLAND</h1>
           <p style={S.subtitle}>SEASON 50 · IN THE HANDS OF THE FANS</p>
         </div>
