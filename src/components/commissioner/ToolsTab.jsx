@@ -122,6 +122,24 @@ export default function ToolsTab({ currentUser, setView }) {
               onClick={() => saveState({ ...appState, draftStatus: 'not_started' })}
             >Cancel</button>
           </div>
+        ) : Object.keys(appState.teams || {}).length > 0 ? (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 16 }}>🔒</span>
+              <span style={{ color: "#A89070", fontSize: 13 }}>
+                Teams are already assigned. Clear all teams to enable drafting.
+              </span>
+            </div>
+            <button
+              style={{ ...S.smallBtnGhost, fontSize: 12, color: "#F87171", borderColor: "rgba(248,113,113,0.3)" }}
+              onClick={async () => {
+                if (!confirm("Clear all teams? This cannot be undone and will enable the draft.")) return;
+                await saveState({ ...appState, teams: {} });
+              }}
+            >
+              Clear All Teams
+            </button>
+          </div>
         ) : (
           <button
             style={S.primaryBtn}
