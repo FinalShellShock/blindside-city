@@ -1,4 +1,11 @@
+import { useEffect } from "react";
+
 export default function HelpPanel({ onClose }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   return (
     <div
       onClick={onClose}

@@ -161,6 +161,11 @@ function App() {
           <LeagueSwitcher onJoinCreate={() => setShowJoinCreate(true)} />
         </div>
         <div className="header-right" style={S.headerRight}>
+          <button
+            onClick={() => setShowHelp(true)}
+            title="Help"
+            style={{ background: "none", border: "1px solid rgba(255,140,66,0.35)", borderRadius: "50%", width: 22, height: 22, color: "#A89070", fontSize: 12, cursor: "pointer", fontFamily: "'Cinzel',serif", fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
+          >?</button>
           <EpisodeSelector/>
           {userProfile?.avatar && (
             <img
@@ -177,11 +182,6 @@ function App() {
           >{displayName}</span>
           {isUserCommissioner && <span style={S.commBadge}>COMMISH</span>}
           {devMode && <span style={{ ...S.commBadge, background: "rgba(74,222,128,0.2)", color: "#4ADE80" }}>DEV</span>}
-          <button
-            onClick={() => setShowHelp(true)}
-            title="Help"
-            style={{ background: "none", border: "1px solid rgba(255,140,66,0.35)", borderRadius: "50%", width: 22, height: 22, color: "#A89070", fontSize: 12, cursor: "pointer", fontFamily: "'Cinzel',serif", fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
-          >?</button>
         </div>
       </header>
 

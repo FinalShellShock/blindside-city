@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { S } from "../../styles/theme.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 
@@ -6,6 +6,12 @@ const STOCK_AVATARS = Array.from({ length: 8 }, (_, i) => `/avatars/avatar${i + 
 
 export default function AccountPanel({ onClose, onSave }) {
   const { userProfile, updateProfile, logOut } = useAuth();
+
+  // Lock body scroll while panel is open (prevents Safari URL bar resize issue)
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
 
   const [displayName, setDisplayName] = useState(userProfile?.displayName || "");
   const [selectedAvatar, setSelectedAvatar] = useState(userProfile?.avatar || "");
