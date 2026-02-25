@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 import Portrait from "../shared/Portrait.jsx";
 
 const MERGED_COLOR = "#FFD93D";
@@ -21,15 +22,8 @@ function elimEpisode(eliminated, name) {
   return normEliminated(eliminated).find(e => e.name === name)?.episode || null;
 }
 
-export default function CastTribesTab({
-  appState,
-  eliminated,
-  tribeOverrides,
-  getEffectiveTribe,
-  confirmEliminate,
-  unEliminate,
-  setContestantTribe,
-}) {
+export default function CastTribesTab() {
+  const { eliminated, tribeOverrides, getEffectiveTribe, confirmEliminate, unEliminate, setContestantTribe } = useLeague();
   const [elimPending, setElimPending] = useState(null);
   const [elimEpInput, setElimEpInput] = useState(1);
 

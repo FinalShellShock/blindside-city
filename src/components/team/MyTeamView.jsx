@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 import Portrait from "../shared/Portrait.jsx";
 import MiniChart from "../shared/MiniChart.jsx";
 import { SkullIcon } from "../shared/Icons.jsx";
@@ -33,18 +34,8 @@ function elimEpisode(eliminated, name) {
   return normEliminated(eliminated).find(e => e.name === name)?.episode || null;
 }
 
-export default function MyTeamView({
-  appState,
-  currentUser,
-  myTeam,
-  contestantScores,
-  teamScores,
-  eliminated,
-  tribeOverrides,
-  getEffectiveTribe,
-  isUserCommissioner,
-  saveState,
-}) {
+export default function MyTeamView({ currentUser, myTeam, isUserCommissioner }) {
+  const { appState, saveState, contestantScores, teamScores, eliminated, tribeOverrides, getEffectiveTribe } = useLeague();
   const [editingTeamName, setEditingTeamName] = useState(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [editingMotto, setEditingMotto] = useState(null);

@@ -1,5 +1,6 @@
 import { S } from "../../styles/theme.js";
 import { CONTESTANTS, TRIBE_COLORS, SCORING_RULES } from "../../gameData.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 import ReactionBar from "../shared/ReactionBar.jsx";
 
 const MERGED_COLOR = "#FFD93D";
@@ -12,16 +13,8 @@ function normEliminated(eliminated) {
   return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
 }
 
-export default function HomeView({
-  appState,
-  currentUser,
-  sortedTeams,
-  feedEpisodes,
-  myTeam,
-  eliminated,
-  addReaction,
-  getEffectiveTribe,
-}) {
+export default function HomeView({ currentUser, myTeam }) {
+  const { appState, sortedTeams, feedEpisodes, eliminated, addReaction, getEffectiveTribe } = useLeague();
 
   return (
     <div>
@@ -81,7 +74,7 @@ export default function HomeView({
                   {ep.recap && (
                     <ReactionBar
                       reactions={ep.recapReactions || {}}
-                      onReact={(emoji) => addReaction(ep.number, "recap", emoji)}
+                      onReact={(emoji) => addReaction(currentUser, ep.number, "recap", emoji)}
                       currentUser={currentUser}
                       users={appState.users}
                     />
@@ -108,7 +101,7 @@ export default function HomeView({
                               </div>
                               <ReactionBar
                                 reactions={(ep.eventReactions || {})[String(i)] || {}}
-                                onReact={(emoji) => addReaction(ep.number, `event_${i}`, emoji)}
+                                onReact={(emoji) => addReaction(currentUser, ep.number, `event_${i}`, emoji)}
                                 currentUser={currentUser}
                                 users={appState.users}
                               />
@@ -137,7 +130,7 @@ export default function HomeView({
                       </div>
                       <ReactionBar
                         reactions={ep.eliminationReactions || {}}
-                        onReact={(emoji) => addReaction(ep.number, "elimination", emoji)}
+                        onReact={(emoji) => addReaction(currentUser, ep.number, "elimination", emoji)}
                         currentUser={currentUser}
                         users={appState.users}
                       />

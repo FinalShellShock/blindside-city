@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { loadState, saveStateToDB, subscribeToState } from "./firebase.js";
-import { SCORING_RULES, CONTESTANTS, DEFAULT_STATE } from "./gameData.js";
+import { useState } from "react";
+import { SCORING_RULES } from "./gameData.js";
 import { globalStyles, S } from "./styles/theme.js";
 import { useAuth } from "./contexts/AuthContext.jsx";
-import { useScoring } from "./hooks/useScoring.js";
+import { useLeague } from "./contexts/LeagueContext.jsx";
 import { TorchIcon } from "./components/shared/Icons.jsx";
 import FireParticles from "./components/shared/FireParticles.jsx";
 import DevPanel, { useDevMode } from "./components/shared/DevPanel.jsx";
@@ -30,151 +29,23 @@ export function elimEpisode(eliminated, name) {
 function App() {
   const devMode = useDevMode();
   const { firebaseUser, userProfile, loading: authLoading, logOut } = useAuth();
+  const { appState, loading: dataLoading, saveState } = useLeague();
 
-  const [appState, setAppState] = useState(null);
-  const [dataLoading, setDataLoading] = useState(true);
   const [view, setView] = useState("home");
   const [authScreen, setAuthScreen] = useState("login"); // "login" | "register"
   const [commishTab, setCommishTab] = useState("scoring");
   const [eventForm, setEventForm] = useState({ contestants: [], event: "", episode: 1 });
   const [episodeRecap, setEpisodeRecap] = useState({ episode: 1, text: "" });
 
-  // Load Firestore data
-  useEffect(() => {
-    let unsubscribe;
-    async function init() {
-      try {
-        const initial = await loadState();
-        setAppState(initial || DEFAULT_STATE);
-        unsubscribe = subscribeToState((ns) => setAppState(ns));
-      } catch (err) {
-        console.error("Firebase load error:", err);
-        setAppState(DEFAULT_STATE);
-      }
-      setDataLoading(false);
-    }
-    init();
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, []);
-
-  const saveState = useCallback(async (ns) => {
-    setAppState(ns);
-    try { await saveStateToDB(ns); }
-    catch (e) { console.error("Save failed:", e); }
-  }, []);
-
   // The user key used in appState.users / appState.commissioners / appState.teams.
   // Migrated users keep their old username key; new Firebase users use their UID.
   const currentUser = userProfile?.migratedFrom ?? firebaseUser?.uid ?? null;
 
   const isUserCommissioner = currentUser && (appState?.commissioners || []).includes(currentUser);
-  const getUserTeam = (u) => Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === u);
+  const myTeam = Object.entries(appState?.teams || {}).find(([_, t]) => t.owner === currentUser);
+  const displayName = appState?.users?.[currentUser]?.displayName || userProfile?.displayName || "Player";
 
-  const getEffectiveTribe = (name) => {
-    const overrides = appState?.tribeOverrides || {};
-    return overrides[name] || CONTESTANTS.find(c => c.name === name)?.tribe || "Unknown";
-  };
-
-  // Scoring — uses the extracted hook
-  const { contestantScores, teamScores, sortedTeams } = useScoring(
-    appState?.episodes || [],
-    appState?.teams || {},
-  );
-
-  // ── Commissioner actions ──
-  const addEvent = async () => {
-    if (!eventForm.contestants.length || !eventForm.event) return;
-    const eps = [...(appState.episodes || [])];
-    let ep = eps.find(e => e.number === eventForm.episode);
-    if (!ep) { ep = { number: eventForm.episode, events: [], recap: "" }; eps.push(ep); }
-    eventForm.contestants.forEach(c => ep.events.push({ contestant: c, type: eventForm.event }));
-    eps.sort((a, b) => a.number - b.number);
-    await saveState({ ...appState, episodes: eps });
-    setEventForm({ ...eventForm, contestants: [], event: "" });
-  };
-
-  const removeEvent = async (en, ei) => {
-    const eps = [...(appState.episodes || [])];
-    const ep = eps.find(e => e.number === en);
-    if (ep) { ep.events.splice(ei, 1); await saveState({ ...appState, episodes: eps }); }
-  };
-
-  const saveRecap = async () => {
-    const eps = [...(appState.episodes || [])];
-    let ep = eps.find(e => e.number === episodeRecap.episode);
-    if (!ep) { ep = { number: episodeRecap.episode, events: [], recap: "" }; eps.push(ep); }
-    ep.recap = episodeRecap.text;
-    eps.sort((a, b) => a.number - b.number);
-    await saveState({ ...appState, episodes: eps });
-  };
-
-  const confirmEliminate = async (name, episode) => {
-    const current = normEliminated(appState.eliminated);
-    current.push({ name, episode: parseInt(episode) || null });
-    await saveState({ ...appState, eliminated: current });
-  };
-
-  const unEliminate = async (name) => {
-    const current = normEliminated(appState.eliminated).filter(e => e.name !== name);
-    await saveState({ ...appState, eliminated: current });
-  };
-
-  const setContestantTribe = async (contestantName, newTribe) => {
-    const overrides = { ...(appState.tribeOverrides || {}) };
-    const original = CONTESTANTS.find(c => c.name === contestantName)?.tribe;
-    if (newTribe === original) { delete overrides[contestantName]; }
-    else { overrides[contestantName] = newTribe; }
-    await saveState({ ...appState, tribeOverrides: overrides });
-  };
-
-  const addReaction = async (episodeNum, target, emoji) => {
-    if (!currentUser) return;
-    const eps = [...(appState.episodes || [])];
-    let ep = eps.find(e => e.number === episodeNum);
-    if (!ep) return;
-    ep = { ...ep };
-    eps[eps.findIndex(e => e.number === episodeNum)] = ep;
-    let reactionField;
-    if (target === "recap") {
-      ep.recapReactions = { ...(ep.recapReactions || {}) };
-      reactionField = ep.recapReactions;
-    } else if (target === "elimination") {
-      ep.eliminationReactions = { ...(ep.eliminationReactions || {}) };
-      reactionField = ep.eliminationReactions;
-    } else {
-      const idx = target.replace("event_", "");
-      ep.eventReactions = { ...(ep.eventReactions || {}) };
-      ep.eventReactions[idx] = { ...(ep.eventReactions[idx] || {}) };
-      reactionField = ep.eventReactions[idx];
-    }
-    const users = [...(reactionField[emoji] || [])];
-    const myIdx = users.indexOf(currentUser);
-    if (myIdx >= 0) { users.splice(myIdx, 1); }
-    else { users.push(currentUser); }
-    reactionField[emoji] = users;
-    await saveState({ ...appState, episodes: eps });
-  };
-
-  // ── Computed feed data ──
-  const eliminated = appState?.eliminated || [];
-  const tribeOverrides = appState?.tribeOverrides || {};
-
-  const feedEpisodes = (() => {
-    const feed = [...(appState?.episodes || [])]
-      .filter(ep => ep.recap || (ep.events || []).length > 0 || normEliminated(eliminated).some(e => e.episode === ep.number))
-      .sort((a, b) => b.number - a.number);
-    normEliminated(eliminated).filter(e => e.episode).forEach(elim => {
-      if (!feed.find(ep => ep.number === elim.episode)) {
-        feed.push({ number: elim.episode, events: [], recap: "" });
-      }
-    });
-    feed.sort((a, b) => b.number - a.number);
-    return feed;
-  })();
-
-  const myTeam = getUserTeam(currentUser);
-
-  // ── Loading screen (auth or data not ready yet) ──
+  // ── Loading screen ──
   if (authLoading || dataLoading) {
     return (
       <div style={S.loadingScreen}>
@@ -193,14 +64,12 @@ function App() {
       <MigrationScreen
         legacyUsername={legacyKey}
         legacyDisplayName={legacyUser?.displayName || legacyKey}
-        onComplete={() => {
-          // MigrationScreen already removed bc_user from localStorage
-        }}
+        onComplete={() => {}}
       />
     );
   }
 
-  // ── Auth screens: not logged in and not a legacy user ──
+  // ── Auth screens ──
   if (!firebaseUser && !devMode) {
     if (authScreen === "register") {
       return <RegisterScreen onSwitchToLogin={() => setAuthScreen("login")} />;
@@ -208,7 +77,7 @@ function App() {
     return <LoginScreen onSwitchToRegister={() => setAuthScreen("register")} />;
   }
 
-  // ── Dev mode login bypass ──
+  // ── Dev mode without login ──
   if (!firebaseUser && devMode) {
     return (
       <div style={S.loginScreen}>
@@ -225,9 +94,6 @@ function App() {
       </div>
     );
   }
-
-  // Resolve display name: prefer appState.users entry (legacy), else userProfile
-  const displayName = appState?.users?.[currentUser]?.displayName || userProfile?.displayName || "Player";
 
   // ── Main app ──
   return (
@@ -278,53 +144,19 @@ function App() {
           <DevPanel appState={appState} saveState={saveState} setCurrentUser={() => {}} currentUser={currentUser}/>
         )}
 
-        {view === "home" && (
-          <HomeView
-            appState={appState}
-            currentUser={currentUser}
-            sortedTeams={sortedTeams}
-            feedEpisodes={feedEpisodes}
-            myTeam={myTeam}
-            eliminated={eliminated}
-            addReaction={addReaction}
-            getEffectiveTribe={getEffectiveTribe}
-          />
-        )}
+        {view === "home" && <HomeView currentUser={currentUser} myTeam={myTeam}/>}
 
         {view === "myteam" && (
           <MyTeamView
-            appState={appState}
             currentUser={currentUser}
             myTeam={myTeam}
-            contestantScores={contestantScores}
-            teamScores={teamScores}
-            eliminated={eliminated}
-            tribeOverrides={tribeOverrides}
-            getEffectiveTribe={getEffectiveTribe}
             isUserCommissioner={isUserCommissioner}
-            saveState={saveState}
           />
         )}
 
-        {view === "leaderboard" && (
-          <ScoreboardView
-            appState={appState}
-            sortedTeams={sortedTeams}
-            teamScores={teamScores}
-            eliminated={eliminated}
-            getEffectiveTribe={getEffectiveTribe}
-          />
-        )}
+        {view === "leaderboard" && <ScoreboardView/>}
 
-        {view === "castStatus" && (
-          <CastView
-            appState={appState}
-            contestantScores={contestantScores}
-            eliminated={eliminated}
-            tribeOverrides={tribeOverrides}
-            getEffectiveTribe={getEffectiveTribe}
-          />
-        )}
+        {view === "castStatus" && <CastView/>}
 
         {view === "rules" && (
           <div style={S.card}>
@@ -342,26 +174,14 @@ function App() {
 
         {view === "admin" && (isUserCommissioner || devMode) && (
           <CommissionerPanel
-            appState={appState}
             currentUser={currentUser}
-            saveState={saveState}
-            setCurrentUser={() => {}}
             setView={setView}
             commishTab={commishTab}
             setCommishTab={setCommishTab}
             eventForm={eventForm}
             setEventForm={setEventForm}
-            addEvent={addEvent}
-            removeEvent={removeEvent}
             episodeRecap={episodeRecap}
             setEpisodeRecap={setEpisodeRecap}
-            saveRecap={saveRecap}
-            eliminated={eliminated}
-            tribeOverrides={tribeOverrides}
-            getEffectiveTribe={getEffectiveTribe}
-            confirmEliminate={confirmEliminate}
-            unEliminate={unEliminate}
-            setContestantTribe={setContestantTribe}
           />
         )}
       </main>

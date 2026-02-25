@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
-import { CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
+import { TRIBE_COLORS } from "../../gameData.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 import MiniChart from "../shared/MiniChart.jsx";
 import { SkullIcon } from "../shared/Icons.jsx";
 
@@ -16,13 +17,8 @@ function isElim(eliminated, name) {
   return normEliminated(eliminated).some(e => e.name === name);
 }
 
-export default function ScoreboardView({
-  appState,
-  sortedTeams,
-  teamScores,
-  eliminated,
-  getEffectiveTribe,
-}) {
+export default function ScoreboardView() {
+  const { appState, sortedTeams, teamScores, eliminated, getEffectiveTribe } = useLeague();
   const [expandedTeam, setExpandedTeam] = useState(null);
 
   return (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE } from "../../gameData.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 
 const STOCK_LOGOS = [
   { id: "torch",    label: "Torch",    url: "/logos/logo-torch.jpg" },
@@ -27,15 +28,8 @@ function isElim(eliminated, name) {
   return normEliminated(eliminated).some(e => e.name === name);
 }
 
-export default function ToolsTab({
-  appState,
-  currentUser,
-  saveState,
-  setCurrentUser,
-  setView,
-  eliminated,
-  getEffectiveTribe,
-}) {
+export default function ToolsTab({ currentUser, setView }) {
+  const { appState, saveState, eliminated, getEffectiveTribe } = useLeague();
   const [announcementDraft, setAnnouncementDraft] = useState(appState.announcement || "");
   const [teamDraft, setTeamDraft] = useState({ teamName: "", members: [], editOwner: null, editKey: null });
 
@@ -173,8 +167,7 @@ export default function ToolsTab({
         <button style={{ ...S.removeBtn, padding: "8px 16px", fontSize: 14 }} onClick={async () => {
           if (confirm("Reset ALL data? This cannot be undone.")) {
             await saveState(DEFAULT_STATE);
-            setCurrentUser(null);
-            setView("login");
+            setView("home");
           }
         }}>Reset Entire League</button>
       </div>

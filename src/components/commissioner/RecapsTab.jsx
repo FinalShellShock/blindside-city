@@ -1,11 +1,10 @@
 import { S } from "../../styles/theme.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 
-export default function RecapsTab({
-  appState,
-  episodeRecap,
-  setEpisodeRecap,
-  saveRecap,
-}) {
+export default function RecapsTab({ episodeRecap, setEpisodeRecap }) {
+  const { appState, saveRecap: saveRecapCtx } = useLeague();
+
+  const saveRecap = () => saveRecapCtx(episodeRecap);
   return (
     <div>
       <div style={S.card}>

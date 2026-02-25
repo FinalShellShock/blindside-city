@@ -1,5 +1,6 @@
 import { S } from "../../styles/theme.js";
 import { SCORING_RULES, CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 
 const MERGED_COLOR = "#FFD93D";
 function tribeColor(tribe) {
@@ -13,15 +14,10 @@ function isElim(eliminated, name) {
   return normEliminated(eliminated).some(e => e.name === name);
 }
 
-export default function ScoringTab({
-  appState,
-  eventForm,
-  setEventForm,
-  addEvent,
-  removeEvent,
-  eliminated,
-  getEffectiveTribe,
-}) {
+export default function ScoringTab({ eventForm, setEventForm }) {
+  const { appState, addEvent: addEventCtx, removeEvent, eliminated, getEffectiveTribe } = useLeague();
+
+  const addEvent = () => addEventCtx(eventForm).then(() => setEventForm({ ...eventForm, contestants: [], event: "" }));
   return (
     <div>
       <div style={S.card}>

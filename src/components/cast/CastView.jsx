@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { S } from "../../styles/theme.js";
 import { CONTESTANTS, TRIBE_COLORS } from "../../gameData.js";
+import { useLeague } from "../../contexts/LeagueContext.jsx";
 import Portrait from "../shared/Portrait.jsx";
 import { SkullIcon } from "../shared/Icons.jsx";
 
@@ -19,13 +20,8 @@ function elimEpisode(eliminated, name) {
   return normEliminated(eliminated).find(e => e.name === name)?.episode || null;
 }
 
-export default function CastView({
-  appState,
-  contestantScores,
-  eliminated,
-  tribeOverrides,
-  getEffectiveTribe,
-}) {
+export default function CastView() {
+  const { appState, contestantScores, eliminated, tribeOverrides, getEffectiveTribe } = useLeague();
   const [expandedCast, setExpandedCast] = useState(null);
 
   return (

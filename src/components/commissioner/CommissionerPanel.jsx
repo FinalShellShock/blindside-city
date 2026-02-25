@@ -12,26 +12,14 @@ const COMMISH_TABS = [
 ];
 
 export default function CommissionerPanel({
-  appState,
   currentUser,
-  saveState,
-  setCurrentUser,
   setView,
   commishTab,
   setCommishTab,
   eventForm,
   setEventForm,
-  addEvent,
-  removeEvent,
   episodeRecap,
   setEpisodeRecap,
-  saveRecap,
-  eliminated,
-  tribeOverrides,
-  getEffectiveTribe,
-  confirmEliminate,
-  unEliminate,
-  setContestantTribe,
 }) {
   return (
     <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
@@ -55,45 +43,16 @@ export default function CommissionerPanel({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         {commishTab === "scoring" && (
-          <ScoringTab
-            appState={appState}
-            eventForm={eventForm}
-            setEventForm={setEventForm}
-            addEvent={addEvent}
-            removeEvent={removeEvent}
-            eliminated={eliminated}
-            getEffectiveTribe={getEffectiveTribe}
-          />
+          <ScoringTab eventForm={eventForm} setEventForm={setEventForm}/>
         )}
         {commishTab === "recaps" && (
-          <RecapsTab
-            appState={appState}
-            episodeRecap={episodeRecap}
-            setEpisodeRecap={setEpisodeRecap}
-            saveRecap={saveRecap}
-          />
+          <RecapsTab episodeRecap={episodeRecap} setEpisodeRecap={setEpisodeRecap}/>
         )}
         {commishTab === "cast" && (
-          <CastTribesTab
-            appState={appState}
-            eliminated={eliminated}
-            tribeOverrides={tribeOverrides}
-            getEffectiveTribe={getEffectiveTribe}
-            confirmEliminate={confirmEliminate}
-            unEliminate={unEliminate}
-            setContestantTribe={setContestantTribe}
-          />
+          <CastTribesTab/>
         )}
         {commishTab === "tools" && (
-          <ToolsTab
-            appState={appState}
-            currentUser={currentUser}
-            saveState={saveState}
-            setCurrentUser={setCurrentUser}
-            setView={setView}
-            eliminated={eliminated}
-            getEffectiveTribe={getEffectiveTribe}
-          />
+          <ToolsTab currentUser={currentUser} setView={setView}/>
         )}
       </div>
     </div>
