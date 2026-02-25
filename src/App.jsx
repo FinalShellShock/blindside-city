@@ -111,9 +111,11 @@ function App() {
   // ── New user with no league: show join/create splash ──
   // A legacy user always lands on "main". A brand-new Firebase user with no leagues
   // and no legacy key should pick or create a league before entering the app.
+  // Also catch stale localStorage leagueIds pointing at deleted/nonexistent leagues:
+  // if appState loaded but has no users map, treat it as no league.
   const isLegacyUser = !!userProfile?.migratedFrom || !!legacyKey;
-  const hasLeague = isLegacyUser || currentLeagueId !== "main" || userLeagues.length > 0;
-  if (!hasLeague && !devMode) {
+  const leagueIsReal = isLegacyUser || userLeagues.length > 0 || (appState?.users && Object.keys(appState.users).length > 0);
+  if (!leagueIsReal && !devMode) {
     return (
       <JoinCreateLeague currentUser={currentUser} displayName={displayName} />
     );
