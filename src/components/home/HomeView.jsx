@@ -26,6 +26,27 @@ export default function HomeView({ currentUser, myTeam }) {
         </div>
       )}
 
+      {/* League Members — shown pre-draft when no teams exist yet */}
+      {sortedTeams.length === 0 && (
+        <div style={S.card}>
+          <h2 style={S.cardTitle}>League Members</h2>
+          {Object.entries(appState.users || {}).length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {Object.entries(appState.users).map(([key, user]) => (
+                <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,140,66,0.15)", border: "1px solid rgba(255,140,66,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+                    🧑‍🌾
+                  </div>
+                  <span style={{ color: "#E8D5B5", fontSize: 15 }}>{user.displayName || key}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: "#A89070" }}>No members yet.</p>
+          )}
+        </div>
+      )}
+
       {/* Standings */}
       <div style={S.card}>
         <h2 style={S.cardTitle}>Standings</h2>
