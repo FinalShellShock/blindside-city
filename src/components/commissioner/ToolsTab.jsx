@@ -32,6 +32,7 @@ export default function ToolsTab({ currentUser, setView }) {
   const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, contestants, tribeColors } = useLeague();
   const [copied, setCopied] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);
+  const [customDraft, setCustomDraft] = useState({ label: "", points: 5 });
 
   const handleCopyCode = () => {
     if (!appState?.inviteCode) return;
@@ -218,6 +219,91 @@ export default function ToolsTab({ currentUser, setView }) {
             Reset All to Defaults
           </button>
         )}
+      </div>
+
+      {/* Custom Scoring Rules */}
+      <div style={S.card}>
+        <h2 style={S.cardTitle}>Custom Scoring Rules</h2>
+        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
+          Add league-specific rules. Custom rules appear alongside built-in rules when recording events.
+        </p>
+
+        {/* Existing custom rules */}
+        {(appState.customRules || []).length > 0 && (
+          <div style={{ display: "grid", gap: 6, marginBottom: 16 }}>
+            {(appState.customRules || []).map(rule => {
+              const inUse = (appState.episodes || []).some(ep =>
+                (ep.events || []).some(ev => ev.type === rule.id)
+              );
+              return (
+                <div key={rule.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <span style={{ flex: 1, color: "#E8D5B5", fontSize: 14 }}>{rule.label}</span>
+                  <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: rule.points >= 0 ? "#4ADE80" : "#F87171", minWidth: 36, textAlign: "center" }}>
+                    {rule.points > 0 ? "+" : ""}{rule.points}
+                  </span>
+                  {inUse
+                    ? <span style={{ fontSize: 11, color: "#A89070", padding: "2px 6px" }}>in use</span>
+                    : (
+                      <button
+                        style={{ ...S.removeBtn, fontSize: 12, padding: "2px 8px" }}
+                        onClick={() => {
+                          const updated = (appState.customRules || []).filter(r => r.id !== rule.id);
+                          saveState({ ...appState, customRules: updated });
+                        }}
+                      >✕ Delete</button>
+                    )
+                  }
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Add new custom rule */}
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div style={{ flex: 2, minWidth: 160 }}>
+            <label style={S.formLabel}>Rule Name</label>
+            <input
+              style={S.input}
+              placeholder="e.g. Finds Hidden Immunity Idol"
+              value={customDraft.label}
+              onChange={e => setCustomDraft(d => ({ ...d, label: e.target.value }))}
+              maxLength={60}
+            />
+          </div>
+          <div style={{ minWidth: 120 }}>
+            <label style={S.formLabel}>Points</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                style={{ ...S.smallBtnGhost, padding: "2px 10px", fontSize: 18, lineHeight: 1 }}
+                onClick={() => setCustomDraft(d => ({ ...d, points: Math.max(-50, d.points - 1) }))}
+              >−</button>
+              <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: customDraft.points >= 0 ? "#4ADE80" : "#F87171", minWidth: 36, textAlign: "center" }}>
+                {customDraft.points > 0 ? "+" : ""}{customDraft.points}
+              </span>
+              <button
+                style={{ ...S.smallBtnGhost, padding: "2px 10px", fontSize: 18, lineHeight: 1 }}
+                onClick={() => setCustomDraft(d => ({ ...d, points: Math.min(50, d.points + 1) }))}
+              >+</button>
+            </div>
+          </div>
+          <button
+            style={{ ...S.primaryBtn, opacity: customDraft.label.trim() ? 1 : 0.4 }}
+            disabled={!customDraft.label.trim()}
+            onClick={() => {
+              const newRule = {
+                id: `custom_${Date.now()}`,
+                label: customDraft.label.trim(),
+                points: customDraft.points,
+              };
+              const updated = [...(appState.customRules || []), newRule];
+              saveState({ ...appState, customRules: updated });
+              setCustomDraft({ label: "", points: 5 });
+            }}
+          >
+            Add Rule
+          </button>
+        </div>
       </div>
 
       {/* Invite Code */}

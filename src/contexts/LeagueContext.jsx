@@ -110,16 +110,19 @@ export function LeagueProvider({ children }) {
     return tribeOverrides[name] || contestants.find(c => c.name === name)?.tribe || "Unknown";
   }, [tribeOverrides, contestants]);
 
-  // Merge commissioner point overrides with defaults — only stored keys are overridden
+  // Merge commissioner point overrides with defaults, then append any custom rules.
+  // Custom rules are stored as appState.customRules: [{ id, label, points }]
   const effectiveScoringRules = useMemo(() => {
     const overrides = appState?.scoringRules || {};
-    if (Object.keys(overrides).length === 0) return SCORING_RULES;
     const merged = {};
     Object.entries(SCORING_RULES).forEach(([k, r]) => {
       merged[k] = overrides[k] !== undefined ? { ...r, points: overrides[k] } : r;
     });
+    (appState?.customRules || []).forEach(r => {
+      merged[r.id] = { label: r.label, points: r.points, custom: true };
+    });
     return merged;
-  }, [appState?.scoringRules]);
+  }, [appState?.scoringRules, appState?.customRules]);
 
   const { contestantScores, teamScores, sortedTeams } = useScoring(
     appState?.episodes || [],

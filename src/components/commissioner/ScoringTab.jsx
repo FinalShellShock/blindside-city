@@ -1,5 +1,4 @@
 import { S } from "../../styles/theme.js";
-import { SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
 const MERGED_COLOR = "#FFD93D";
@@ -15,7 +14,7 @@ function isElim(eliminated, name) {
 }
 
 export default function ScoringTab({ eventForm, setEventForm }) {
-  const { appState, addEvent: addEventCtx, removeEvent, eliminated, getEffectiveTribe, contestants, tribeColors } = useLeague();
+  const { appState, addEvent: addEventCtx, removeEvent, eliminated, getEffectiveTribe, contestants, tribeColors, effectiveScoringRules } = useLeague();
 
   const addEvent = () => addEventCtx(eventForm).then(() => setEventForm({ ...eventForm, contestants: [], event: "" }));
   return (
@@ -30,7 +29,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
           <label style={S.formLabel}>Scoring Event</label>
           <select value={eventForm.event} onChange={e => setEventForm({ ...eventForm, event: e.target.value })} style={S.select}>
             <option value="">Select event...</option>
-            {Object.entries(SCORING_RULES).map(([k, r]) => (
+            {Object.entries(effectiveScoringRules).map(([k, r]) => (
               <option key={k} value={k}>{r.label} ({r.points > 0 ? "+" : ""}{r.points})</option>
             ))}
           </select>
@@ -74,9 +73,9 @@ export default function ScoringTab({ eventForm, setEventForm }) {
             {ep.events.map((ev, i) => (
               <div key={i} style={{ ...S.eventRow, alignItems: "center" }}>
                 <span style={S.eventContestant}>{ev.contestant}</span>
-                <span style={S.eventLabel}>{SCORING_RULES[ev.type]?.label}</span>
-                <span style={{ ...S.eventPoints, color: SCORING_RULES[ev.type]?.points >= 0 ? "#4ADE80" : "#F87171" }}>
-                  {SCORING_RULES[ev.type]?.points > 0 ? "+" : ""}{SCORING_RULES[ev.type]?.points}
+                <span style={S.eventLabel}>{effectiveScoringRules[ev.type]?.label}</span>
+                <span style={{ ...S.eventPoints, color: effectiveScoringRules[ev.type]?.points >= 0 ? "#4ADE80" : "#F87171" }}>
+                  {effectiveScoringRules[ev.type]?.points > 0 ? "+" : ""}{effectiveScoringRules[ev.type]?.points}
                 </span>
                 <button onClick={() => removeEvent(ep.number, i)} style={S.removeBtn}>✕</button>
               </div>
