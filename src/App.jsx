@@ -122,6 +122,7 @@ function App() {
   if ((!leagueIsReal || showJoinCreate) && !devMode) {
     return (
       <JoinCreateLeague
+        firebaseUid={firebaseUser?.uid}
         currentUser={currentUser}
         displayName={displayName}
         onBack={leagueIsReal ? () => setShowJoinCreate(false) : null}

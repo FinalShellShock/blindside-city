@@ -74,15 +74,18 @@ export function LeagueProvider({ children }) {
     }
   }, []);
 
-  const createNewLeague = useCallback(async (uid, displayName, leagueName) => {
-    const leagueId = await createLeague(uid, displayName, leagueName, DEFAULT_STATE);
+  // uid = Firebase Auth UID (for profile doc writes)
+  // leagueUserKey = key used inside league docs (same as uid for new users,
+  //   or the legacy username for migrated users e.g. "johnny")
+  const createNewLeague = useCallback(async (uid, leagueUserKey, displayName, leagueName) => {
+    const leagueId = await createLeague(uid, leagueUserKey, displayName, leagueName, DEFAULT_STATE);
     await refreshUserLeagues(uid);
     setCurrentLeagueId(leagueId);
     return leagueId;
   }, [refreshUserLeagues, setCurrentLeagueId]);
 
-  const joinLeague = useCallback(async (uid, displayName, inviteCode) => {
-    const leagueId = await joinLeagueByCode(uid, displayName, inviteCode);
+  const joinLeague = useCallback(async (uid, leagueUserKey, displayName, inviteCode) => {
+    const leagueId = await joinLeagueByCode(uid, leagueUserKey, displayName, inviteCode);
     if (!leagueId) return null;
     await refreshUserLeagues(uid);
     setCurrentLeagueId(leagueId);

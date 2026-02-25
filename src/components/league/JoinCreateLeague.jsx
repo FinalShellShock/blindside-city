@@ -4,7 +4,7 @@ import { TorchIcon } from "../shared/Icons.jsx";
 import FireParticles from "../shared/FireParticles.jsx";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
-export default function JoinCreateLeague({ currentUser, displayName, onBack }) {
+export default function JoinCreateLeague({ firebaseUid, currentUser, displayName, onBack }) {
   const { createNewLeague, joinLeague } = useLeague();
 
   const [tab, setTab] = useState("join"); // "join" | "create"
@@ -18,7 +18,7 @@ export default function JoinCreateLeague({ currentUser, displayName, onBack }) {
     setBusy(true);
     setError("");
     try {
-      const id = await joinLeague(currentUser, displayName, inviteCode.trim());
+      const id = await joinLeague(firebaseUid, currentUser, displayName, inviteCode.trim());
       if (!id) setError("Invalid invite code. Double-check and try again.");
       else if (onBack) onBack(); // dismiss overlay on success
     } catch (e) {
@@ -37,7 +37,7 @@ export default function JoinCreateLeague({ currentUser, displayName, onBack }) {
     setBusy(true);
     setError("");
     try {
-      await createNewLeague(currentUser, displayName, leagueName.trim());
+      await createNewLeague(firebaseUid, currentUser, displayName, leagueName.trim());
       if (onBack) onBack(); // dismiss overlay on success
     } catch (e) {
       console.error("Create league error:", e);

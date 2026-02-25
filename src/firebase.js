@@ -54,25 +54,29 @@ function generateInviteCode() {
 }
 
 // Create a brand-new league. Returns the new leagueId.
-export async function createLeague(uid, displayName, leagueName, initialState) {
+// uid = Firebase Auth UID (for the user's profile doc)
+// leagueUserKey = the key used inside the league doc's users/commissioners maps
+//   For migrated legacy users these differ (e.g. uid="abc123", leagueUserKey="johnny")
+//   For new users they are the same.
+export async function createLeague(uid, leagueUserKey, displayName, leagueName, initialState) {
   const leagueId = Math.random().toString(36).substring(2, 10);
   const inviteCode = generateInviteCode();
 
   // Write invite code lookup doc
   await setDoc(doc(db, 'inviteCodes', inviteCode), { leagueId });
 
-  // Write the league document — seed cast and tribe colors from game defaults
+  // Write the league document — use leagueUserKey for commissioner/user entries
   await setDoc(leagueDoc(leagueId), {
     ...initialState,
     leagueName,
-    commissioners: [uid],
+    commissioners: [leagueUserKey],
     inviteCode,
-    users: { [uid]: { displayName } },
+    users: { [leagueUserKey]: { displayName } },
     contestants: CONTESTANTS,
     tribeColors: TRIBE_COLORS,
   });
 
-  // Add league to the user's profile (setDoc+merge works even if `leagues` field is missing)
+  // Add league to the user's profile doc — keyed by Firebase Auth UID
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
   const existing = userSnap.exists() ? (userSnap.data().leagues || []) : [];
@@ -87,23 +91,24 @@ export async function createLeague(uid, displayName, leagueName, initialState) {
 }
 
 // Join a league via invite code. Returns the leagueId or null if invalid.
-export async function joinLeagueByCode(uid, displayName, inviteCode) {
+export async function joinLeagueByCode(uid, leagueUserKey, displayName, inviteCode) {
   const codeDoc = doc(db, 'inviteCodes', inviteCode.toUpperCase());
   const codeSnap = await getDoc(codeDoc);
   if (!codeSnap.exists()) return null;
 
   const { leagueId } = codeSnap.data();
+  if (leagueId === '__revoked__') return null;
   const leagueSnap = await getDoc(leagueDoc(leagueId));
   if (!leagueSnap.exists()) return null;
 
   const leagueData = leagueSnap.data();
 
-  // Add user to league's users map (merge so existing keys aren't wiped)
+  // Add user to league's users map using leagueUserKey
   await setDoc(leagueDoc(leagueId), {
-    users: { ...leagueData.users, [uid]: { displayName } },
+    users: { ...leagueData.users, [leagueUserKey]: { displayName } },
   }, { merge: true });
 
-  // Add league to user's profile (setDoc+merge works even if `leagues` field is missing)
+  // Add league to user's profile doc — keyed by Firebase Auth UID
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
   const existing = userSnap.exists() ? (userSnap.data().leagues || []) : [];
