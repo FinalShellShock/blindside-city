@@ -133,6 +133,7 @@ export default function AccountPanel({ onClose, onSave }) {
         <button
           style={{ ...S.logoutBtn, width: "100%", marginTop: 12, justifyContent: "center", textAlign: "center" }}
           onClick={async () => {
+            if (!window.confirm("Are you sure you want to log out?")) return;
             localStorage.removeItem("bc_user");
             await logOut();
             onClose();
