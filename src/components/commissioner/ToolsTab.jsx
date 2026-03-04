@@ -441,63 +441,104 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Migrate Legacy Events */}
       <div style={S.card}>
-        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Migrate Legacy Events <Tip text="Converts individual events from before the tribe system to tribe events. Section 1 shows auto-detectable same-tribe groups. Section 2 shows everything else — mixed or partial groups — so you can manually convert or leave them." /></h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Migrate Legacy Events <Tip text="Converts individual contestant events to tribe events. Auto-detects single-tribe groups and multi-tribe groups that split cleanly by tribe. Anything that doesn't fit cleanly goes to Manual Review." /></h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
-          Two sections: auto-detected groups (convert all at once) and a manual review section for anything the tool couldn't auto-detect. Color-coded by tribe.
+          Scans for individual events that can be converted to tribe events. Multi-tribe groups (e.g. two tribes winning immunity) are detected and split automatically.
         </p>
         {(() => {
           const rawElim = (appState.eliminated || []).map(e =>
             typeof e === "string" ? { name: e, episode: null } : e
           );
+          // Use original tribe (c.tribe from gameData), NOT getEffectiveTribe,
+          // so post-merge players are still recognized as their starting tribe
+          function originalTribe(name) {
+            return contestants.find(c => c.name === name)?.tribe || "Unknown";
+          }
           function activeAtEp(episode, tribe) {
             return contestants.filter(c => {
-              if (getEffectiveTribe(c.name) !== tribe) return false;
+              if (c.tribe !== tribe) return false;
               const er = rawElim.find(e => e.name === c.name);
               if (!er) return true;
               return er.episode === null || er.episode > episode;
             }).map(c => c.name).sort();
           }
 
-          // Scan all episodes: separate into auto-convert vs manual review
-          const conversions = [];   // same-tribe groups that can be bulk-converted
-          const reviewItems = [];   // everything else that's still individual events
+          const conversions = [];
+          const reviewItems = [];
 
           (appState.episodes || []).forEach(ep => {
             const byType = {};
             (ep.events || []).forEach((ev, idx) => {
-              if (ev.tribe || ev.tribes) return; // already converted
+              if (ev.tribe || ev.tribes) return;
               if (!ev.contestant) return;
               if (!byType[ev.type]) byType[ev.type] = [];
               byType[ev.type].push({ idx, name: ev.contestant });
             });
             Object.entries(byType).forEach(([type, entries]) => {
               const names = entries.map(e => e.name).sort();
-              const tribesPresent = [...new Set(names.map(n => getEffectiveTribe(n)))];
+              const tribesPresent = [...new Set(names.map(n => originalTribe(n)))];
 
               if (tribesPresent.length === 1) {
+                // Single tribe — check exact or subset match
                 const tribe = tribesPresent[0];
                 const active = activeAtEp(ep.number, tribe);
                 const isExact = JSON.stringify(names) === JSON.stringify(active);
                 const isSubset = !isExact && names.every(n => active.includes(n));
                 if (isExact || isSubset) {
-                  conversions.push({ episode: ep.number, type, tribe, indices: entries.map(e => e.idx), names, isExact, activeCount: active.length });
-                  return; // handled
+                  conversions.push({ episode: ep.number, type, isSplit: false, tribe, indices: entries.map(e => e.idx), names, isExact, activeCount: active.length });
+                  return;
+                }
+              } else if (tribesPresent.length > 1) {
+                // Multi-tribe — check if each tribe's subset is a clean match
+                const splits = tribesPresent.map(tribe => {
+                  const tribeEntries = entries.filter(e => originalTribe(e.name) === tribe);
+                  const tribeNames = tribeEntries.map(e => e.name).sort();
+                  const active = activeAtEp(ep.number, tribe);
+                  const isExact = JSON.stringify(tribeNames) === JSON.stringify(active);
+                  const isSubset = !isExact && tribeNames.every(n => active.includes(n));
+                  return { tribe, names: tribeNames, indices: tribeEntries.map(e => e.idx), isValid: isExact || isSubset, isExact, activeCount: active.length };
+                });
+                if (splits.every(s => s.isValid)) {
+                  conversions.push({ episode: ep.number, type, isSplit: true, splits, allIndices: entries.map(e => e.idx) });
+                  return;
                 }
               }
-              // Didn't auto-detect → goes to manual review
+              // Didn't auto-detect → manual review
               reviewItems.push({ episode: ep.number, type, entries, tribesPresent, singleTribe: tribesPresent.length === 1 ? tribesPresent[0] : null });
             });
           });
 
           const nothing = conversions.length === 0 && reviewItems.length === 0;
 
-          async function convertGroup(indices, epNum, tribe, names) {
-            if (!confirm(`Convert ${indices.length} event${indices.length !== 1 ? "s" : ""} (Ep ${epNum} · ${tribe}) to a tribe event?`)) return;
+          // Apply all conversions for a set of episodes safely (handles index shifting)
+          async function applyConversions(convList) {
             const eps = JSON.parse(JSON.stringify(appState.episodes || []));
-            const ep = eps.find(e => e.number === epNum);
-            if (!ep) return;
-            [...indices].sort((a, b) => b - a).forEach(i => ep.events.splice(i, 1));
-            ep.events.push({ tribe, type: reviewItems.find(r => r.episode === epNum)?.type || conversions.find(c => c.episode === epNum)?.type, contestants: names });
+            // Group by episode so we can remove all indices at once before adding new events
+            const byEp = {};
+            convList.forEach(conv => {
+              if (!byEp[conv.episode]) byEp[conv.episode] = [];
+              byEp[conv.episode].push(conv);
+            });
+            Object.entries(byEp).forEach(([epNum, epConvs]) => {
+              const ep = eps.find(e => e.number === parseInt(epNum));
+              if (!ep) return;
+              // Collect all indices to remove across all conversions in this episode
+              const allIdx = [];
+              epConvs.forEach(conv => {
+                if (conv.isSplit) allIdx.push(...conv.allIndices);
+                else allIdx.push(...conv.indices);
+              });
+              // Remove in descending order to preserve correctness
+              [...new Set(allIdx)].sort((a, b) => b - a).forEach(i => ep.events.splice(i, 1));
+              // Add new tribe events
+              epConvs.forEach(conv => {
+                if (conv.isSplit) {
+                  conv.splits.forEach(split => ep.events.push({ tribe: split.tribe, type: conv.type, contestants: split.names }));
+                } else {
+                  ep.events.push({ tribe: conv.tribe, type: conv.type, contestants: conv.names });
+                }
+              });
+            });
             await saveState({ ...appState, episodes: eps });
           }
 
@@ -509,11 +550,23 @@ export default function ToolsTab({ currentUser, setView }) {
                   <p style={{ color: "#E8D5B5", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>✅ Auto-detectable ({conversions.length} group{conversions.length !== 1 ? "s" : ""})</p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
                     {conversions.map((c, i) => (
-                      <div key={i} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, borderLeft: `3px solid ${tribeColor(tribeColors, c.tribe)}` }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <span style={{ color: tribeColor(tribeColors, c.tribe), fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{c.tribe.toUpperCase()}</span>
+                      <div key={i} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, borderLeft: `3px solid ${c.isSplit ? "#A89070" : tribeColor(tribeColors, c.tribe)}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          {c.isSplit ? (
+                            <>
+                              {c.splits.map((s, si) => (
+                                <span key={s.tribe}>
+                                  <span style={{ color: tribeColor(tribeColors, s.tribe), fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{s.tribe.toUpperCase()}</span>
+                                  {si < c.splits.length - 1 && <span style={{ color: "#A89070", fontSize: 12 }}> + </span>}
+                                </span>
+                              ))}
+                              <span style={{ fontSize: 11, color: "#FFD93D", background: "rgba(255,217,61,0.1)", padding: "1px 6px", borderRadius: 4 }}>SPLIT</span>
+                            </>
+                          ) : (
+                            <span style={{ color: tribeColor(tribeColors, c.tribe), fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{c.tribe.toUpperCase()}</span>
+                          )}
                           <span style={{ color: "#A89070", fontSize: 13 }}>· Ep {c.episode} · {effectiveScoringRules[c.type]?.label || c.type}</span>
-                          {!c.isExact && <span style={{ fontSize: 11, color: "#FFD93D", background: "rgba(255,217,61,0.1)", padding: "1px 6px", borderRadius: 4 }}>{c.names.length}/{c.activeCount} members</span>}
+                          {!c.isSplit && !c.isExact && <span style={{ fontSize: 11, color: "#FFD93D", background: "rgba(255,217,61,0.1)", padding: "1px 6px", borderRadius: 4 }}>{c.names.length}/{c.activeCount} members</span>}
                         </div>
                       </div>
                     ))}
@@ -522,14 +575,7 @@ export default function ToolsTab({ currentUser, setView }) {
                     style={S.primaryBtn}
                     onClick={async () => {
                       if (!confirm(`Convert all ${conversions.length} auto-detected group${conversions.length !== 1 ? "s" : ""} to tribe events?`)) return;
-                      const eps = JSON.parse(JSON.stringify(appState.episodes || []));
-                      conversions.forEach(conv => {
-                        const ep = eps.find(e => e.number === conv.episode);
-                        if (!ep) return;
-                        conv.indices.sort((a, b) => b - a).forEach(i => ep.events.splice(i, 1));
-                        ep.events.push({ tribe: conv.tribe, type: conv.type, contestants: conv.names });
-                      });
-                      await saveState({ ...appState, episodes: eps });
+                      await applyConversions(conversions);
                     }}
                   >Convert All {conversions.length} Auto-Detected Group{conversions.length !== 1 ? "s" : ""}</button>
                 </div>
@@ -539,14 +585,14 @@ export default function ToolsTab({ currentUser, setView }) {
               {reviewItems.length > 0 && (
                 <div>
                   <p style={{ color: "#E8D5B5", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🔍 Manual review ({reviewItems.length} group{reviewItems.length !== 1 ? "s" : ""})</p>
-                  <p style={{ color: "#A89070", fontSize: 12, marginBottom: 10 }}>These couldn't be auto-detected. If they look like a tribe event, hit "Convert as TRIBE". Mixed tribes stay as individual events.</p>
+                  <p style={{ color: "#A89070", fontSize: 12, marginBottom: 10 }}>These couldn't be auto-detected. Single-tribe groups can still be manually converted. Truly mixed groups stay as individual events.</p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {reviewItems.map((item, i) => (
                       <div key={i} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, borderLeft: `3px solid ${item.singleTribe ? tribeColor(tribeColors, item.singleTribe) : "#555"}` }}>
                         <p style={{ color: "#E8D5B5", fontSize: 13, marginBottom: 6 }}>Ep {item.episode} · {effectiveScoringRules[item.type]?.label || item.type}</p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
                           {item.entries.map(e => (
-                            <span key={e.name} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: tribeColor(tribeColors, getEffectiveTribe(e.name)) + "33", color: tribeColor(tribeColors, getEffectiveTribe(e.name)) }}>
+                            <span key={e.name} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: tribeColor(tribeColors, originalTribe(e.name)) + "33", color: tribeColor(tribeColors, originalTribe(e.name)) }}>
                               {e.name}
                             </span>
                           ))}
@@ -556,12 +602,7 @@ export default function ToolsTab({ currentUser, setView }) {
                             style={{ ...S.smallBtnGhost, fontSize: 12, borderColor: tribeColor(tribeColors, item.singleTribe) + "66", color: tribeColor(tribeColors, item.singleTribe) }}
                             onClick={async () => {
                               if (!confirm(`Convert ${item.entries.length} individual event${item.entries.length !== 1 ? "s" : ""} to a ${item.singleTribe} tribe event?`)) return;
-                              const eps = JSON.parse(JSON.stringify(appState.episodes || []));
-                              const ep = eps.find(e => e.number === item.episode);
-                              if (!ep) return;
-                              item.entries.map(e => e.idx).sort((a, b) => b - a).forEach(i => ep.events.splice(i, 1));
-                              ep.events.push({ tribe: item.singleTribe, type: item.type, contestants: item.entries.map(e => e.name) });
-                              await saveState({ ...appState, episodes: eps });
+                              await applyConversions([{ episode: item.episode, type: item.type, isSplit: false, tribe: item.singleTribe, indices: item.entries.map(e => e.idx), names: item.entries.map(e => e.name) }]);
                             }}
                           >Convert as {item.singleTribe.toUpperCase()}</button>
                         ) : (
