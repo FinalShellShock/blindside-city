@@ -84,9 +84,11 @@ export default function ScoringTab({ eventForm, setEventForm }) {
         {/* Episode # */}
         <div style={S.formRow}>
           <label style={S.formLabel}>Episode #</label>
-          <input type="number" min="1" max="20" value={eventForm.episode}
-            onChange={e => setEventForm({ ...eventForm, episode: parseInt(e.target.value) || 1 })}
-            style={{ ...S.input, width: 80 }}/>
+          <select value={eventForm.episode} onChange={e => setEventForm({ ...eventForm, episode: parseInt(e.target.value) || 1 })} style={{ ...S.select, width: "auto" }}>
+            {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+              <option key={n} value={n}>Episode {n}</option>
+            ))}
+          </select>
         </div>
 
         {/* Scoring Event */}
@@ -184,7 +186,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
       {/* Event Log */}
       <div style={S.card}>
         <h2 style={S.cardTitle}>Event Log</h2>
-        {[...appState.episodes].sort((a, b) => b.number - a.number).map(ep => (
+        {[...appState.episodes].sort((a, b) => b.number - a.number).filter(ep => ep.events.length > 0).map(ep => (
           <div key={ep.number} style={{ marginBottom: 20 }}>
             <p style={S.epLabel}>Episode {ep.number}</p>
             {ep.events.map((ev, i) => {

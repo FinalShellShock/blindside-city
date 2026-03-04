@@ -236,9 +236,9 @@ export function LeagueProvider({ children }) {
     await saveState({ ...appState, episodes: eps });
   }, [appState, saveState]);
 
-  const confirmEliminate = useCallback(async (name, episode) => {
+  const confirmEliminate = useCallback(async (name, episode, type = "voted_out") => {
     const normElim = (appState.eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
-    normElim.push({ name, episode: parseInt(episode) || null });
+    normElim.push({ name, episode: parseInt(episode) || null, type });
     await saveState({ ...appState, eliminated: normElim });
   }, [appState, saveState]);
 
@@ -266,7 +266,14 @@ export function LeagueProvider({ children }) {
     if (target === "recap") {
       ep.recapReactions = { ...(ep.recapReactions || {}) };
       reactionField = ep.recapReactions;
+    } else if (target.startsWith("elim_")) {
+      // Per-player elimination reaction: key is the contestant name
+      const elimName = target.slice(5);
+      ep.eliminationReactions = { ...(ep.eliminationReactions || {}) };
+      ep.eliminationReactions[elimName] = { ...(ep.eliminationReactions[elimName] || {}) };
+      reactionField = ep.eliminationReactions[elimName];
     } else if (target === "elimination") {
+      // Legacy key — keep for backward compat
       ep.eliminationReactions = { ...(ep.eliminationReactions || {}) };
       reactionField = ep.eliminationReactions;
     } else {

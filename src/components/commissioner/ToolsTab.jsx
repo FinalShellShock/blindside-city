@@ -441,33 +441,57 @@ export default function ToolsTab({ currentUser, setView }) {
 
       {/* Migrate Legacy Events */}
       <div style={S.card}>
-        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Migrate Legacy Events <Tip text="Converts old individual events to tribe events where the contestants exactly match a full tribe roster. Run this once to clean up events logged before tribe-level scoring was added. Safe to run — shows a preview first." /></h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Migrate Legacy Events <Tip text="Converts individual events logged before the tribe system to tribe events. Detects groups where all contestants are from the same tribe — including partial rosters when someone had already been eliminated. Shows a preview first." /></h2>
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
-          Finds groups of individual events that match an entire tribe roster and converts them to a single tribe event. Shows a preview before making any changes.
+          Scans all episodes for individual events where every contestant is from the same tribe, and converts them to a single tribe event. Handles partial rosters (e.g. if one member was already eliminated). Safe — shows a preview before changing anything.
         </p>
         {(() => {
-          // Build tribe rosters from current assignments
           const tribeNames = Object.keys(tribeColors);
-          const tribeRosters = {};
-          tribeNames.forEach(t => {
-            tribeRosters[t] = contestants.filter(c => getEffectiveTribe(c.name) === t).map(c => c.name).sort();
-          });
 
-          // Find individual events that exactly match a tribe roster
+          // Who was active in a tribe at a given episode?
+          // Uses appState.eliminated (raw/unfiltered) so watchedThrough doesn't skew results.
+          const rawElim = (appState.eliminated || []).map(e =>
+            typeof e === "string" ? { name: e, episode: null } : e
+          );
+          function activeAtEp(episode, tribe) {
+            return contestants.filter(c => {
+              if (getEffectiveTribe(c.name) !== tribe) return false;
+              const er = rawElim.find(e => e.name === c.name);
+              if (!er) return true; // never eliminated
+              // Still active if eliminated in this episode or later
+              return er.episode === null || er.episode > episode;
+            }).map(c => c.name).sort();
+          }
+
+          // Find convertible groups
           const conversions = [];
           (appState.episodes || []).forEach(ep => {
             const byType = {};
             (ep.events || []).forEach((ev, idx) => {
-              if (ev.tribe) return; // already a tribe event
+              if (ev.tribe || ev.tribes) return; // already a tribe event
               if (!ev.contestant) return;
               if (!byType[ev.type]) byType[ev.type] = [];
               byType[ev.type].push({ idx, name: ev.contestant });
             });
             Object.entries(byType).forEach(([type, entries]) => {
               const names = entries.map(e => e.name).sort();
-              const matchingTribe = tribeNames.find(t => JSON.stringify(tribeRosters[t]) === JSON.stringify(names));
-              if (matchingTribe) {
-                conversions.push({ episode: ep.number, type, tribe: matchingTribe, indices: entries.map(e => e.idx) });
+              // All contestants must be from the same tribe
+              const tribesPresent = [...new Set(names.map(n => getEffectiveTribe(n)))];
+              if (tribesPresent.length !== 1) return; // mixed — skip
+              const tribe = tribesPresent[0];
+              const active = activeAtEp(ep.number, tribe);
+              // Full match: exactly matches active roster
+              const isExact = JSON.stringify(names) === JSON.stringify(active);
+              // Partial match: all logged names are from that tribe and were active
+              const isSubset = !isExact && names.every(n => active.includes(n));
+              if (isExact || isSubset) {
+                conversions.push({
+                  episode: ep.number, type, tribe,
+                  indices: entries.map(e => e.idx),
+                  names,
+                  isExact,
+                  activeCount: active.length,
+                });
               }
             });
           });
@@ -482,8 +506,15 @@ export default function ToolsTab({ currentUser, setView }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
                 {conversions.map((c, i) => (
                   <div key={i} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, borderLeft: `3px solid ${tribeColor(tribeColors, c.tribe)}` }}>
-                    <span style={{ color: tribeColor(tribeColors, c.tribe), fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{c.tribe.toUpperCase()}</span>
-                    <span style={{ color: "#A89070", fontSize: 13 }}> · Ep {c.episode} · {effectiveScoringRules[c.type]?.label || c.type}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ color: tribeColor(tribeColors, c.tribe), fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{c.tribe.toUpperCase()}</span>
+                      <span style={{ color: "#A89070", fontSize: 13 }}>· Ep {c.episode} · {effectiveScoringRules[c.type]?.label || c.type}</span>
+                      {!c.isExact && (
+                        <span style={{ fontSize: 11, color: "#FFD93D", background: "rgba(255,217,61,0.1)", padding: "1px 6px", borderRadius: 4 }}>
+                          {c.names.length}/{c.activeCount} members
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -495,10 +526,10 @@ export default function ToolsTab({ currentUser, setView }) {
                   conversions.forEach(conv => {
                     const ep = eps.find(e => e.number === conv.episode);
                     if (!ep) return;
-                    // Remove individual events (highest index first to avoid index shifting)
+                    // Remove individual events (highest index first to avoid shifting)
                     conv.indices.sort((a, b) => b - a).forEach(i => ep.events.splice(i, 1));
-                    // Add the tribe event
-                    ep.events.push({ tribe: conv.tribe, type: conv.type, contestants: tribeRosters[conv.tribe] });
+                    // Add a single tribe event — contestants = exactly who was logged
+                    ep.events.push({ tribe: conv.tribe, type: conv.type, contestants: conv.names });
                   });
                   await saveState({ ...appState, episodes: eps });
                 }}

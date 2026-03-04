@@ -8,10 +8,6 @@ function tribeColor(tribeColors, tribe) {
   return tribeColors[tribe] || "#666";
 }
 
-function normEliminated(eliminated) {
-  return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
-}
-
 // Renders recap text with simple formatting:
 //   - Lines starting with "- " become bullet points
 //   - Blank lines add spacing between paragraphs
@@ -45,6 +41,22 @@ function renderRecap(text) {
   });
   flushBullets();
   return <div>{output}</div>;
+}
+
+function normEliminated(arr) {
+  return (arr || []).map(e =>
+    typeof e === "string" ? { name: e, episode: null, type: "voted_out" } : { type: "voted_out", ...e }
+  );
+}
+function elimIcon(type) {
+  if (type === "medevac" || type === "injury") return "🩺";
+  if (type === "quit") return "🏳️";
+  return null; // voted_out uses the skull SVG
+}
+function elimText(type) {
+  if (type === "medevac" || type === "injury") return "medically evacuated";
+  if (type === "quit") return "quit the game";
+  return "torch snuffed";
 }
 
 export default function HomeView({ currentUser, myTeam }) {
@@ -118,8 +130,8 @@ export default function HomeView({ currentUser, myTeam }) {
         <div>
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: "#FFD93D", marginBottom: 12, letterSpacing: 1 }}>Episode Feed</h2>
           {feedEpisodes.map(ep => {
-            const epElim = normEliminated(eliminated).find(e => e.episode === ep.number);
             const epEvents = ep.events || [];
+            const epElims = normEliminated(eliminated).filter(e => e.episode === ep.number);
             return (
               <div key={ep.number} style={{ ...S.card, padding: 0, overflow: "hidden", marginBottom: 16 }}>
                 {/* Episode header */}
@@ -190,27 +202,39 @@ export default function HomeView({ currentUser, myTeam }) {
                   ) : <p style={{ color: "rgba(168,144,112,0.4)", fontSize: 14, fontStyle: "italic", padding: "0 20px 12px" }}>No scoring events yet.</p>}
                 </div>
 
-                {/* Elimination */}
+                {/* Eliminations — supports multiple per episode + type icons */}
                 <div style={{ padding: "12px 20px" }}>
                   <p style={{ fontFamily: "'Cinzel',serif", fontSize: 11, fontWeight: 700, color: "#A89070", letterSpacing: 2, marginBottom: 8 }}>🕯️ ELIMINATED</p>
-                  {epElim ? (
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px" }}>
-                        <span style={{ color: "#F87171", fontWeight: 700, fontSize: 14, textDecoration: "line-through", flexShrink: 0 }}>{epElim.name}</span>
-                        <span style={{ color: "#A89070", fontSize: 13 }}>torch snuffed</span>
-                        <svg width={13} height={13} viewBox="0 0 16 16" fill="none" style={{ display: "inline", verticalAlign: "middle" }}>
-                          <circle cx="8" cy="7" r="6" fill="#3D3020" stroke="#F87171" strokeWidth="1"/>
-                          <circle cx="6" cy="6" r="1.2" fill="#F87171"/>
-                          <circle cx="10" cy="6" r="1.2" fill="#F87171"/>
-                          <rect x="7" y="9" width="2" height="2" rx="0.5" fill="#F87171"/>
-                        </svg>
-                      </div>
-                      <ReactionBar
-                        reactions={ep.eliminationReactions || {}}
-                        onReact={(emoji) => addReaction(currentUser, ep.number, "elimination", emoji)}
-                        currentUser={currentUser}
-                        users={appState.users}
-                      />
+                  {epElims.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {epElims.map(elim => {
+                        const icon = elimIcon(elim.type);
+                        const isVotedOut = !icon;
+                        return (
+                          <div key={elim.name}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px" }}>
+                              <span style={{ color: "#F87171", fontWeight: 700, fontSize: 14, textDecoration: "line-through", flexShrink: 0 }}>{elim.name}</span>
+                              <span style={{ color: "#A89070", fontSize: 13 }}>{elimText(elim.type)}</span>
+                              {isVotedOut ? (
+                                <svg width={13} height={13} viewBox="0 0 16 16" fill="none" style={{ display: "inline", verticalAlign: "middle", flexShrink: 0 }}>
+                                  <circle cx="8" cy="7" r="6" fill="#3D3020" stroke="#F87171" strokeWidth="1"/>
+                                  <circle cx="6" cy="6" r="1.2" fill="#F87171"/>
+                                  <circle cx="10" cy="6" r="1.2" fill="#F87171"/>
+                                  <rect x="7" y="9" width="2" height="2" rx="0.5" fill="#F87171"/>
+                                </svg>
+                              ) : (
+                                <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>
+                              )}
+                            </div>
+                            <ReactionBar
+                              reactions={(ep.eliminationReactions || {})[elim.name] || {}}
+                              onReact={(emoji) => addReaction(currentUser, ep.number, `elim_${elim.name}`, emoji)}
+                              currentUser={currentUser}
+                              users={appState.users}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : <p style={{ color: "rgba(168,144,112,0.4)", fontSize: 14, fontStyle: "italic" }}>No elimination recorded.</p>}
                 </div>

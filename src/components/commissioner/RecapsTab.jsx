@@ -44,7 +44,11 @@ export default function RecapsTab({ episodeRecap, setEpisodeRecap }) {
         <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>Recaps appear on the Home page episode feed once saved.</p>
         <div style={S.formRow}>
           <label style={S.formLabel}>Episode #</label>
-          <input type="number" min="1" max="20" value={episodeRecap.episode} onChange={e => setEpisodeRecap({ ...episodeRecap, episode: parseInt(e.target.value) || 1 })} style={{ ...S.input, width: 80 }}/>
+          <select value={episodeRecap.episode} onChange={e => setEpisodeRecap({ ...episodeRecap, episode: parseInt(e.target.value) || 1 })} style={{ ...S.select, width: "auto" }}>
+            {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+              <option key={n} value={n}>Episode {n}</option>
+            ))}
+          </select>
         </div>
         <textarea
           style={{ ...S.input, minHeight: 120, resize: "vertical" }}
