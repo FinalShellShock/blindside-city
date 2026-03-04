@@ -144,55 +144,50 @@ export default function HomeView({ currentUser, myTeam }) {
                   )}
                 </div>
 
-                {/* Scoring events — grouped by type; tribe events show tribe name, individual show colored names */}
+                {/* Scoring events — one row per logged event */}
                 <div style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                   <p style={{ fontFamily: "'Cinzel',serif", fontSize: 11, fontWeight: 700, color: "#A89070", letterSpacing: 2, padding: "12px 20px 8px" }}>⚡ SCORING EVENTS</p>
-                  {epEvents.length > 0 ? (() => {
-                    const groups = {};
-                    epEvents.forEach(ev => {
-                      if (!groups[ev.type]) groups[ev.type] = { tribes: [], individuals: [] };
-                      if (ev.tribe) {
-                        groups[ev.type].tribes.push(ev.tribe);
-                      } else if (ev.contestant) {
-                        groups[ev.type].individuals.push(ev.contestant);
-                      }
-                    });
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "0 20px 8px" }}>
-                        {Object.entries(groups).map(([type, group]) => {
-                          const rule = effectiveScoringRules[type] || { label: type, points: 0 };
-                          return (
-                            <div key={type}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 2px", flexWrap: "wrap" }}>
-                                <span style={{ color: "#A89070", fontSize: 13, flexShrink: 0 }}>{rule.label}</span>
-                                <span style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1, minWidth: 0, alignItems: "center" }}>
-                                  {group.tribes.map((tribe, i) => (
-                                    <span key={`t-${i}`} style={{ color: tribeColor(tribeColors, tribe), fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>
-                                      {tribe.toUpperCase()}
-                                    </span>
-                                  ))}
-                                  {group.individuals.map((name, i) => (
-                                    <span key={`i-${i}`} style={{ color: tribeColor(tribeColors, getEffectiveTribe(name)), fontWeight: 600, fontSize: 14 }}>
-                                      {name}{i < group.individuals.length - 1 ? "," : ""}
-                                    </span>
-                                  ))}
-                                </span>
-                                <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
-                                  {rule.points > 0 ? "+" : ""}{rule.points}
-                                </span>
+                  {epEvents.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 20px 8px" }}>
+                      {epEvents.map((ev, i) => {
+                        const rule = effectiveScoringRules[ev.type] || { label: ev.type, points: 0 };
+                        const isMultiTribe = Array.isArray(ev.tribes);
+                        const isSingleTribe = !isMultiTribe && !!ev.tribe;
+                        return (
+                          <div key={i}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 2px", flexWrap: "wrap" }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                {isMultiTribe ? (
+                                  <span style={{ display: "block" }}>
+                                    {ev.tribes.map((t, ti) => (
+                                      <span key={t}>
+                                        <span style={{ color: tribeColor(tribeColors, t), fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>{t.toUpperCase()}</span>
+                                        {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 12 }}> + </span>}
+                                      </span>
+                                    ))}
+                                  </span>
+                                ) : isSingleTribe ? (
+                                  <span style={{ display: "block", color: tribeColor(tribeColors, ev.tribe), fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>{ev.tribe.toUpperCase()}</span>
+                                ) : (
+                                  <span style={{ display: "block", color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
+                                )}
+                                <span style={{ display: "block", color: "#A89070", fontSize: 13 }}>{rule.label}</span>
                               </div>
-                              <ReactionBar
-                                reactions={(ep.eventReactions || {})[`type_${type}`] || {}}
-                                onReact={(emoji) => addReaction(currentUser, ep.number, `event_type_${type}`, emoji)}
-                                currentUser={currentUser}
-                                users={appState.users}
-                              />
+                              <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
+                                {rule.points > 0 ? "+" : ""}{rule.points}
+                              </span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })() : <p style={{ color: "rgba(168,144,112,0.4)", fontSize: 14, fontStyle: "italic", padding: "0 20px 12px" }}>No scoring events yet.</p>}
+                            <ReactionBar
+                              reactions={(ep.eventReactions || {})[String(i)] || {}}
+                              onReact={(emoji) => addReaction(currentUser, ep.number, `event_${i}`, emoji)}
+                              currentUser={currentUser}
+                              users={appState.users}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : <p style={{ color: "rgba(168,144,112,0.4)", fontSize: 14, fontStyle: "italic", padding: "0 20px 12px" }}>No scoring events yet.</p>}
                 </div>
 
                 {/* Elimination */}

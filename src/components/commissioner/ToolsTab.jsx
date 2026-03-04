@@ -51,7 +51,7 @@ function Tip({ text }) {
 }
 
 export default function ToolsTab({ currentUser, setView }) {
-  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, removeLeague, contestants, tribeColors, currentLeagueId, userLeagues } = useLeague();
+  const { appState, saveState, eliminated, getEffectiveTribe, regenInviteCode, removeLeague, contestants, tribeColors, currentLeagueId, userLeagues, effectiveScoringRules } = useLeague();
   const { firebaseUser } = useAuth();
   const [copied, setCopied] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);

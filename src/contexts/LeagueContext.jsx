@@ -195,15 +195,24 @@ export function LeagueProvider({ children }) {
   // ── Actions ──
   const addEvent = useCallback(async (eventForm) => {
     if (!eventForm.event) return;
-    const isTribe = eventForm.mode === "tribe" && eventForm.tribe;
-    if (!isTribe && !eventForm.contestants.length) return;
-    if (isTribe && !eventForm.contestants.length) return;
+    // Normalise tribe(s): new code sends tribes:[], legacy sends tribe:""
+    const tribes = eventForm.tribes?.length ? eventForm.tribes
+      : eventForm.tribe ? [eventForm.tribe]
+      : [];
+    const isTribe = eventForm.mode === "tribe" && tribes.length > 0;
+    if (!isTribe && !eventForm.contestants?.length) return;
+    if (isTribe && !eventForm.contestants?.length) return;
     const eps = [...(appState.episodes || [])];
     let ep = eps.find(e => e.number === eventForm.episode);
     if (!ep) { ep = { number: eventForm.episode, events: [], recap: "" }; eps.push(ep); }
     if (isTribe) {
-      // Tribe event: one entry with a snapshotted contestant list
-      ep.events.push({ tribe: eventForm.tribe, type: eventForm.event, contestants: eventForm.contestants });
+      // Single tribe → { tribe, type, contestants[] }
+      // Multi-tribe  → { tribes[], type, contestants[] }
+      if (tribes.length === 1) {
+        ep.events.push({ tribe: tribes[0], type: eventForm.event, contestants: eventForm.contestants });
+      } else {
+        ep.events.push({ tribes, type: eventForm.event, contestants: eventForm.contestants });
+      }
     } else {
       // Individual events (original format — fully backward compatible)
       eventForm.contestants.forEach(c => ep.events.push({ contestant: c, type: eventForm.event }));

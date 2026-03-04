@@ -31,28 +31,38 @@ function isElim(eliminated, name) {
 export default function ScoringTab({ eventForm, setEventForm }) {
   const { appState, addEvent: addEventCtx, removeEvent, eliminated, getEffectiveTribe, contestants, tribeColors, effectiveScoringRules } = useLeague();
 
-  // Tribe mode local state
+  // Tribe mode local state — selectedTribes is an array for multi-select
   const [mode, setMode] = useState("individual"); // "individual" | "tribe"
-  const [selectedTribe, setSelectedTribe] = useState(null);
+  const [selectedTribes, setSelectedTribes] = useState([]);
 
   // All tribe names from tribeColors (e.g. ["Cila", "Kalo", "Vatu", "Merged"])
   const tribeNames = Object.keys(tribeColors);
 
-  // Members of a given tribe based on current tribe assignments
+  // Active (non-eliminated) members of a given tribe
   const tribeMembers = (tribeName) =>
     contestants
       .filter(c => !isElim(eliminated, c.name) && getEffectiveTribe(c.name) === tribeName)
       .map(c => c.name);
 
+  // All members across all selected tribes
+  const selectedMembers = selectedTribes.flatMap(t => tribeMembers(t));
+
+  const toggleTribe = (tribeName) => {
+    setSelectedTribes(prev =>
+      prev.includes(tribeName)
+        ? prev.filter(t => t !== tribeName)
+        : [...prev, tribeName]
+    );
+  };
+
   const handleAddEvent = async () => {
     if (!eventForm.event) return;
     if (mode === "tribe") {
-      if (!selectedTribe) return;
-      const members = tribeMembers(selectedTribe);
-      if (!members.length) return;
-      await addEventCtx({ ...eventForm, mode: "tribe", tribe: selectedTribe, contestants: members });
+      if (!selectedTribes.length) return;
+      if (!selectedMembers.length) return;
+      await addEventCtx({ ...eventForm, mode: "tribe", tribes: selectedTribes, contestants: selectedMembers });
       setEventForm({ ...eventForm, event: "" });
-      setSelectedTribe(null);
+      setSelectedTribes([]);
     } else {
       if (!eventForm.contestants.length) return;
       await addEventCtx(eventForm);
@@ -61,14 +71,14 @@ export default function ScoringTab({ eventForm, setEventForm }) {
   };
 
   const addBtnDisabled = mode === "tribe"
-    ? !eventForm.event || !selectedTribe
+    ? !eventForm.event || !selectedTribes.length
     : !eventForm.contestants.length || !eventForm.event;
 
   return (
     <div>
       <div style={S.card}>
         <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>
-          Update Scoring <Tip text="Log scoring events from each episode. Select the episode number, the event type, then choose Individual (specific contestants) or Tribe (entire tribe at once). Points are applied immediately." />
+          Update Scoring <Tip text="Log scoring events from each episode. Select the episode, the event type, then choose Individual or Tribe. In Tribe mode you can select multiple tribes at once — great for reward challenges where two tribes win, or for logging 'survives the vote' for all tribes that didn't attend tribal." />
         </h2>
 
         {/* Episode # */}
@@ -95,7 +105,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
           <label style={S.formLabel}>Score By</label>
           <div style={{ display: "flex", gap: 8 }}>
             <button
-              onClick={() => { setMode("individual"); setSelectedTribe(null); }}
+              onClick={() => { setMode("individual"); setSelectedTribes([]); }}
               style={{ ...S.smallBtnGhost, ...(mode === "individual" ? { background: "rgba(255,107,53,0.12)", borderColor: "rgba(255,107,53,0.3)", color: "#FF8C42" } : {}) }}
             >Individual</button>
             <button
@@ -137,35 +147,37 @@ export default function ScoringTab({ eventForm, setEventForm }) {
           </div>
         )}
 
-        {/* Tribe mode: tribe chip picker */}
+        {/* Tribe mode: tribe chip picker — multi-select */}
         {mode === "tribe" && (
           <div style={S.formRow}>
-            <label style={S.formLabel}>Select Tribe</label>
+            <label style={S.formLabel}>
+              Select Tribe(s) — tap to select/deselect
+            </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
               {tribeNames.map(tribeName => {
                 const members = tribeMembers(tribeName);
                 if (!members.length) return null;
-                const sel = selectedTribe === tribeName;
+                const sel = selectedTribes.includes(tribeName);
                 const color = tribeColor(tribeColors, tribeName);
                 return (
                   <button key={tribeName}
-                    onClick={() => setSelectedTribe(sel ? null : tribeName)}
+                    onClick={() => toggleTribe(tribeName)}
                     style={{ padding: "8px 16px", borderRadius: 20, border: `1px solid ${sel ? color : "rgba(255,255,255,0.15)"}`, background: sel ? color + "33" : "rgba(255,255,255,0.03)", color: sel ? color : "#A89070", fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: sel ? 700 : 400, cursor: "pointer", letterSpacing: 1 }}>
                     {tribeName.toUpperCase()}
                   </button>
                 );
               })}
             </div>
-            {selectedTribe && (
+            {selectedTribes.length > 0 && (
               <p style={{ color: "#A89070", fontSize: 12 }}>
-                Credits: {tribeMembers(selectedTribe).join(", ")}
+                Credits ({selectedMembers.length}): {selectedMembers.join(", ")}
               </p>
             )}
           </div>
         )}
 
         <button style={{ ...S.primaryBtn, opacity: addBtnDisabled ? 0.4 : 1 }} onClick={handleAddEvent}>
-          Add Event{mode === "tribe" && selectedTribe ? ` — ${selectedTribe}` : ""}
+          Add Event{mode === "tribe" && selectedTribes.length ? ` — ${selectedTribes.join(" + ")}` : ""}
         </button>
       </div>
 
@@ -176,13 +188,23 @@ export default function ScoringTab({ eventForm, setEventForm }) {
           <div key={ep.number} style={{ marginBottom: 20 }}>
             <p style={S.epLabel}>Episode {ep.number}</p>
             {ep.events.map((ev, i) => {
-              const isTribeEv = !!ev.tribe;
+              const isMultiTribe = Array.isArray(ev.tribes);
+              const isSingleTribe = !isMultiTribe && !!ev.tribe;
               const label = effectiveScoringRules[ev.type]?.label;
               const pts = effectiveScoringRules[ev.type]?.points;
               return (
                 <div key={i} style={{ ...S.eventRow, alignItems: "center", flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {isTribeEv ? (
+                    {isMultiTribe ? (
+                      <span style={{ ...S.eventContestant, display: "block" }}>
+                        {ev.tribes.map((t, ti) => (
+                          <span key={t}>
+                            <span style={{ color: tribeColor(tribeColors, t), fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 12, fontWeight: 700 }}>{t.toUpperCase()}</span>
+                            {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 12 }}> + </span>}
+                          </span>
+                        ))}
+                      </span>
+                    ) : isSingleTribe ? (
                       <span style={{ ...S.eventContestant, display: "block", color: tribeColor(tribeColors, ev.tribe), fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 12 }}>
                         {ev.tribe.toUpperCase()}
                       </span>
@@ -202,6 +224,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
                 </div>
               );
             })}
+            {ep.events.length === 0 && <p style={{ color: "rgba(168,144,112,0.3)", fontSize: 13, fontStyle: "italic" }}>No events logged.</p>}
           </div>
         ))}
         {appState.episodes.length === 0 && <p style={{ color: "#A89070" }}>No events recorded yet.</p>}
