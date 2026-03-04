@@ -1,6 +1,38 @@
 import { S } from "../../styles/theme.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 
+function renderRecap(text) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const output = [];
+  let bulletBuffer = [];
+  const flushBullets = () => {
+    if (bulletBuffer.length === 0) return;
+    output.push(
+      <ul key={`ul-${output.length}`} style={{ paddingLeft: 20, margin: "2px 0 6px" }}>
+        {bulletBuffer.map((b, j) => (
+          <li key={j} style={{ color: "#E8D5B5", fontSize: 15, lineHeight: 1.6 }}>{b}</li>
+        ))}
+      </ul>
+    );
+    bulletBuffer = [];
+  };
+  lines.forEach((line, i) => {
+    if (line.startsWith("- ")) {
+      bulletBuffer.push(line.slice(2));
+    } else {
+      flushBullets();
+      if (line.trim() === "") {
+        output.push(<div key={i} style={{ height: 6 }} />);
+      } else {
+        output.push(<p key={i} style={{ color: "#E8D5B5", fontSize: 15, lineHeight: 1.6, margin: "2px 0" }}>{line}</p>);
+      }
+    }
+  });
+  flushBullets();
+  return <div>{output}</div>;
+}
+
 export default function RecapsTab({ episodeRecap, setEpisodeRecap }) {
   const { appState, saveRecap: saveRecapCtx } = useLeague();
 
@@ -29,7 +61,7 @@ export default function RecapsTab({ episodeRecap, setEpisodeRecap }) {
           {[...(appState.episodes || [])].filter(ep => ep.recap).sort((a, b) => b.number - a.number).map(ep => (
             <div key={ep.number} style={{ marginBottom: 16, padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 8, borderLeft: "3px solid #FF8C42" }}>
               <p style={S.epLabel}>Episode {ep.number}</p>
-              <p style={{ color: "#E8D5B5", fontSize: 15, lineHeight: 1.5 }}>{ep.recap}</p>
+              {renderRecap(ep.recap)}
             </div>
           ))}
         </div>

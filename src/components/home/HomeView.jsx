@@ -1,5 +1,4 @@
 import { S } from "../../styles/theme.js";
-import { SCORING_RULES } from "../../gameData.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 import ReactionBar from "../shared/ReactionBar.jsx";
 
@@ -13,8 +12,43 @@ function normEliminated(eliminated) {
   return (eliminated || []).map(e => typeof e === "string" ? { name: e, episode: null } : e);
 }
 
+// Renders recap text with simple formatting:
+//   - Lines starting with "- " become bullet points
+//   - Blank lines add spacing between paragraphs
+function renderRecap(text) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const output = [];
+  let bulletBuffer = [];
+  const flushBullets = () => {
+    if (bulletBuffer.length === 0) return;
+    output.push(
+      <ul key={`ul-${output.length}`} style={{ paddingLeft: 20, margin: "2px 0 6px" }}>
+        {bulletBuffer.map((b, j) => (
+          <li key={j} style={{ color: "#E8D5B5", fontSize: 15, lineHeight: 1.6 }}>{b}</li>
+        ))}
+      </ul>
+    );
+    bulletBuffer = [];
+  };
+  lines.forEach((line, i) => {
+    if (line.startsWith("- ")) {
+      bulletBuffer.push(line.slice(2));
+    } else {
+      flushBullets();
+      if (line.trim() === "") {
+        output.push(<div key={i} style={{ height: 6 }} />);
+      } else {
+        output.push(<p key={i} style={{ color: "#E8D5B5", fontSize: 15, lineHeight: 1.6, margin: "2px 0" }}>{line}</p>);
+      }
+    }
+  });
+  flushBullets();
+  return <div>{output}</div>;
+}
+
 export default function HomeView({ currentUser, myTeam }) {
-  const { appState, sortedTeams, feedEpisodes, eliminated, addReaction, getEffectiveTribe, tribeColors } = useLeague();
+  const { appState, sortedTeams, feedEpisodes, eliminated, addReaction, getEffectiveTribe, tribeColors, effectiveScoringRules } = useLeague();
 
   return (
     <div>
@@ -97,7 +131,7 @@ export default function HomeView({ currentUser, myTeam }) {
                 <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                   <p style={{ fontFamily: "'Cinzel',serif", fontSize: 11, fontWeight: 700, color: "#A89070", letterSpacing: 2, marginBottom: 8 }}>📖 RECAP</p>
                   {ep.recap
-                    ? <p style={{ color: "#E8D5B5", fontSize: 15, lineHeight: 1.6 }}>{ep.recap}</p>
+                    ? renderRecap(ep.recap)
                     : <p style={{ color: "rgba(168,144,112,0.4)", fontSize: 14, fontStyle: "italic" }}>No recap posted yet.</p>
                   }
                   {ep.recap && (
@@ -110,27 +144,31 @@ export default function HomeView({ currentUser, myTeam }) {
                   )}
                 </div>
 
-                {/* Scoring events */}
+                {/* Scoring events — grouped by event type */}
                 <div style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                   <p style={{ fontFamily: "'Cinzel',serif", fontSize: 11, fontWeight: 700, color: "#A89070", letterSpacing: 2, padding: "12px 20px 8px" }}>⚡ SCORING EVENTS</p>
-                  {epEvents.length > 0 ? (
-                    <div style={{ maxHeight: 180, overflowY: "auto", overflowX: "visible", paddingBottom: 8 }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 20px" }}>
-                        {epEvents.map((ev, i) => {
-                          const rule = SCORING_RULES[ev.type] || { label: ev.type, points: 0 };
-                          const curTribe = getEffectiveTribe(ev.contestant);
+                  {epEvents.length > 0 ? (() => {
+                    const groups = {};
+                    epEvents.forEach(ev => {
+                      if (!groups[ev.type]) groups[ev.type] = [];
+                      groups[ev.type].push(ev.contestant);
+                    });
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 20px 8px" }}>
+                        {Object.entries(groups).map(([type, contestants]) => {
+                          const rule = effectiveScoringRules[type] || { label: type, points: 0 };
                           return (
-                            <div key={i}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px" }}>
-                                <span style={{ fontWeight: 700, fontSize: 14, color: tribeColor(tribeColors, curTribe), flexShrink: 0 }}>{ev.contestant}</span>
-                                <span style={{ color: "#A89070", fontSize: 13, flex: 1 }}>{rule.label}</span>
+                            <div key={type}>
+                              <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "5px 2px", flexWrap: "wrap" }}>
+                                <span style={{ color: "#A89070", fontSize: 13, flexShrink: 0 }}>{rule.label}</span>
+                                <span style={{ color: "#E8D5B5", fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0 }}>{contestants.join(", ")}</span>
                                 <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
                                   {rule.points > 0 ? "+" : ""}{rule.points}
                                 </span>
                               </div>
                               <ReactionBar
-                                reactions={(ep.eventReactions || {})[String(i)] || {}}
-                                onReact={(emoji) => addReaction(currentUser, ep.number, `event_${i}`, emoji)}
+                                reactions={(ep.eventReactions || {})[`type_${type}`] || {}}
+                                onReact={(emoji) => addReaction(currentUser, ep.number, `event_type_${type}`, emoji)}
                                 currentUser={currentUser}
                                 users={appState.users}
                               />
@@ -138,8 +176,8 @@ export default function HomeView({ currentUser, myTeam }) {
                           );
                         })}
                       </div>
-                    </div>
-                  ) : <p style={{ color: "rgba(168,144,112,0.4)", fontSize: 14, fontStyle: "italic", padding: "0 20px 12px" }}>No scoring events yet.</p>}
+                    );
+                  })() : <p style={{ color: "rgba(168,144,112,0.4)", fontSize: 14, fontStyle: "italic", padding: "0 20px 12px" }}>No scoring events yet.</p>}
                 </div>
 
                 {/* Elimination */}
