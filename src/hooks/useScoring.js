@@ -11,17 +11,15 @@ export function useScoring(episodes = [], teams = {}, scoringRules = SCORING_RUL
     filteredEpisodes.forEach(ep => {
       (ep.events || []).forEach(ev => {
         const r = scoringRules[ev.type];
-        if (r && s[ev.contestant]) {
-          s[ev.contestant].total += r.points;
-          s[ev.contestant].events.push({
-            episode: ep.number,
-            type: ev.type,
-            label: r.label,
-            points: r.points,
-          });
-          s[ev.contestant].byEpisode[ep.number] =
-            (s[ev.contestant].byEpisode[ep.number] || 0) + r.points;
-        }
+        if (!r) return;
+        // Normalize: tribe events have ev.contestants[], individual events have ev.contestant
+        const targets = ev.contestants ? ev.contestants : (ev.contestant ? [ev.contestant] : []);
+        targets.forEach(name => {
+          if (!s[name]) return;
+          s[name].total += r.points;
+          s[name].events.push({ episode: ep.number, type: ev.type, label: r.label, points: r.points });
+          s[name].byEpisode[ep.number] = (s[name].byEpisode[ep.number] || 0) + r.points;
+        });
       });
     });
     return s;

@@ -439,6 +439,77 @@ export default function ToolsTab({ currentUser, setView }) {
         </button>
       </div>
 
+      {/* Migrate Legacy Events */}
+      <div style={S.card}>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Migrate Legacy Events <Tip text="Converts old individual events to tribe events where the contestants exactly match a full tribe roster. Run this once to clean up events logged before tribe-level scoring was added. Safe to run — shows a preview first." /></h2>
+        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
+          Finds groups of individual events that match an entire tribe roster and converts them to a single tribe event. Shows a preview before making any changes.
+        </p>
+        {(() => {
+          // Build tribe rosters from current assignments
+          const tribeNames = Object.keys(tribeColors);
+          const tribeRosters = {};
+          tribeNames.forEach(t => {
+            tribeRosters[t] = contestants.filter(c => getEffectiveTribe(c.name) === t).map(c => c.name).sort();
+          });
+
+          // Find individual events that exactly match a tribe roster
+          const conversions = [];
+          (appState.episodes || []).forEach(ep => {
+            const byType = {};
+            (ep.events || []).forEach((ev, idx) => {
+              if (ev.tribe) return; // already a tribe event
+              if (!ev.contestant) return;
+              if (!byType[ev.type]) byType[ev.type] = [];
+              byType[ev.type].push({ idx, name: ev.contestant });
+            });
+            Object.entries(byType).forEach(([type, entries]) => {
+              const names = entries.map(e => e.name).sort();
+              const matchingTribe = tribeNames.find(t => JSON.stringify(tribeRosters[t]) === JSON.stringify(names));
+              if (matchingTribe) {
+                conversions.push({ episode: ep.number, type, tribe: matchingTribe, indices: entries.map(e => e.idx) });
+              }
+            });
+          });
+
+          if (conversions.length === 0) {
+            return <p style={{ color: "#4ADE80", fontSize: 14 }}>✓ No legacy events to convert.</p>;
+          }
+
+          return (
+            <div>
+              <p style={{ color: "#E8D5B5", fontSize: 14, marginBottom: 12 }}>Found {conversions.length} group{conversions.length > 1 ? "s" : ""} to convert:</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                {conversions.map((c, i) => (
+                  <div key={i} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, borderLeft: `3px solid ${tribeColor(tribeColors, c.tribe)}` }}>
+                    <span style={{ color: tribeColor(tribeColors, c.tribe), fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{c.tribe.toUpperCase()}</span>
+                    <span style={{ color: "#A89070", fontSize: 13 }}> · Ep {c.episode} · {effectiveScoringRules[c.type]?.label || c.type}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                style={S.primaryBtn}
+                onClick={async () => {
+                  if (!confirm(`Convert ${conversions.length} event group${conversions.length > 1 ? "s" : ""} to tribe events? This rewrites those episode entries.`)) return;
+                  const eps = JSON.parse(JSON.stringify(appState.episodes || []));
+                  conversions.forEach(conv => {
+                    const ep = eps.find(e => e.number === conv.episode);
+                    if (!ep) return;
+                    // Remove individual events (highest index first to avoid index shifting)
+                    conv.indices.sort((a, b) => b - a).forEach(i => ep.events.splice(i, 1));
+                    // Add the tribe event
+                    ep.events.push({ tribe: conv.tribe, type: conv.type, contestants: tribeRosters[conv.tribe] });
+                  });
+                  await saveState({ ...appState, episodes: eps });
+                }}
+              >
+                Convert {conversions.length} Group{conversions.length > 1 ? "s" : ""} to Tribe Events
+              </button>
+            </div>
+          );
+        })()}
+      </div>
+
       {/* Danger Zone */}
       <div style={{ ...S.card, borderColor: "rgba(248,113,113,0.3)" }}>
         <h2 style={{ ...S.cardTitle, color: "#F87171", display: "flex", alignItems: "center", gap: 8 }}>Danger Zone <Tip text="Reset wipes all league data back to defaults (teams, scores, episodes). Delete permanently removes the entire league. Both actions are irreversible." /></h2>

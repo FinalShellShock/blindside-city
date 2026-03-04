@@ -31,15 +31,55 @@ function isElim(eliminated, name) {
 export default function ScoringTab({ eventForm, setEventForm }) {
   const { appState, addEvent: addEventCtx, removeEvent, eliminated, getEffectiveTribe, contestants, tribeColors, effectiveScoringRules } = useLeague();
 
-  const addEvent = () => addEventCtx(eventForm).then(() => setEventForm({ ...eventForm, contestants: [], event: "" }));
+  // Tribe mode local state
+  const [mode, setMode] = useState("individual"); // "individual" | "tribe"
+  const [selectedTribe, setSelectedTribe] = useState(null);
+
+  // All tribe names from tribeColors (e.g. ["Cila", "Kalo", "Vatu", "Merged"])
+  const tribeNames = Object.keys(tribeColors);
+
+  // Members of a given tribe based on current tribe assignments
+  const tribeMembers = (tribeName) =>
+    contestants
+      .filter(c => !isElim(eliminated, c.name) && getEffectiveTribe(c.name) === tribeName)
+      .map(c => c.name);
+
+  const handleAddEvent = async () => {
+    if (!eventForm.event) return;
+    if (mode === "tribe") {
+      if (!selectedTribe) return;
+      const members = tribeMembers(selectedTribe);
+      if (!members.length) return;
+      await addEventCtx({ ...eventForm, mode: "tribe", tribe: selectedTribe, contestants: members });
+      setEventForm({ ...eventForm, event: "" });
+      setSelectedTribe(null);
+    } else {
+      if (!eventForm.contestants.length) return;
+      await addEventCtx(eventForm);
+      setEventForm({ ...eventForm, contestants: [], event: "" });
+    }
+  };
+
+  const addBtnDisabled = mode === "tribe"
+    ? !eventForm.event || !selectedTribe
+    : !eventForm.contestants.length || !eventForm.event;
+
   return (
     <div>
       <div style={S.card}>
-        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Update Scoring <Tip text="Log scoring events from each episode. Select the episode number, the event type, and the contestant(s) involved. Points are applied immediately and reflected in the scoreboard." /></h2>
+        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>
+          Update Scoring <Tip text="Log scoring events from each episode. Select the episode number, the event type, then choose Individual (specific contestants) or Tribe (entire tribe at once). Points are applied immediately." />
+        </h2>
+
+        {/* Episode # */}
         <div style={S.formRow}>
           <label style={S.formLabel}>Episode #</label>
-          <input type="number" min="1" max="20" value={eventForm.episode} onChange={e => setEventForm({ ...eventForm, episode: parseInt(e.target.value) || 1 })} style={{ ...S.input, width: 80 }}/>
+          <input type="number" min="1" max="20" value={eventForm.episode}
+            onChange={e => setEventForm({ ...eventForm, episode: parseInt(e.target.value) || 1 })}
+            style={{ ...S.input, width: 80 }}/>
         </div>
+
+        {/* Scoring Event */}
         <div style={S.formRow}>
           <label style={S.formLabel}>Scoring Event</label>
           <select value={eventForm.event} onChange={e => setEventForm({ ...eventForm, event: e.target.value })} style={S.select}>
@@ -49,56 +89,119 @@ export default function ScoringTab({ eventForm, setEventForm }) {
             ))}
           </select>
         </div>
+
+        {/* Mode toggle */}
         <div style={S.formRow}>
-          <label style={S.formLabel}>Contestants ({eventForm.contestants.length} selected — tap to select/deselect)</label>
-          <div style={S.contestantPicker}>
-            {contestants.filter(c => !isElim(eliminated, c.name)).map(c => {
-              const sel = eventForm.contestants.includes(c.name);
-              return (
-                <button key={c.name} onClick={() => setEventForm({ ...eventForm, contestants: sel ? eventForm.contestants.filter(x => x !== c.name) : [...eventForm.contestants, c.name] })}
-                  style={{ ...S.contestantChip, background: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.1)", fontWeight: sel ? 700 : 400 }}>
-                  {c.name}
-                </button>
-              );
-            })}
-            {normEliminated(eliminated).length > 0 && (<>
-              <div style={{ width: "100%", borderTop: "1px solid rgba(255,255,255,0.06)", margin: "6px 0" }}/>
-              {contestants.filter(c => isElim(eliminated, c.name)).map(c => {
+          <label style={S.formLabel}>Score By</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => { setMode("individual"); setSelectedTribe(null); }}
+              style={{ ...S.smallBtnGhost, ...(mode === "individual" ? { background: "rgba(255,107,53,0.12)", borderColor: "rgba(255,107,53,0.3)", color: "#FF8C42" } : {}) }}
+            >Individual</button>
+            <button
+              onClick={() => { setMode("tribe"); setEventForm({ ...eventForm, contestants: [] }); }}
+              style={{ ...S.smallBtnGhost, ...(mode === "tribe" ? { background: "rgba(255,107,53,0.12)", borderColor: "rgba(255,107,53,0.3)", color: "#FF8C42" } : {}) }}
+            >Tribe</button>
+          </div>
+        </div>
+
+        {/* Individual mode: contestant chip picker */}
+        {mode === "individual" && (
+          <div style={S.formRow}>
+            <label style={S.formLabel}>Contestants ({eventForm.contestants.length} selected — tap to select/deselect)</label>
+            <div style={S.contestantPicker}>
+              {contestants.filter(c => !isElim(eliminated, c.name)).map(c => {
                 const sel = eventForm.contestants.includes(c.name);
                 return (
-                  <button key={c.name} onClick={() => setEventForm({ ...eventForm, contestants: sel ? eventForm.contestants.filter(x => x !== c.name) : [...eventForm.contestants, c.name] })}
-                    style={{ ...S.contestantChip, background: sel ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.03)", color: sel ? "#F87171" : "#555", borderColor: sel ? "rgba(248,113,113,0.5)" : "rgba(255,255,255,0.06)", textDecoration: "line-through" }}>
-                    ☠ {c.name}
+                  <button key={c.name}
+                    onClick={() => setEventForm({ ...eventForm, contestants: sel ? eventForm.contestants.filter(x => x !== c.name) : [...eventForm.contestants, c.name] })}
+                    style={{ ...S.contestantChip, background: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.1)", fontWeight: sel ? 700 : 400 }}>
+                    {c.name}
                   </button>
                 );
               })}
-            </>)}
+              {normEliminated(eliminated).length > 0 && (<>
+                <div style={{ width: "100%", borderTop: "1px solid rgba(255,255,255,0.06)", margin: "6px 0" }}/>
+                {contestants.filter(c => isElim(eliminated, c.name)).map(c => {
+                  const sel = eventForm.contestants.includes(c.name);
+                  return (
+                    <button key={c.name}
+                      onClick={() => setEventForm({ ...eventForm, contestants: sel ? eventForm.contestants.filter(x => x !== c.name) : [...eventForm.contestants, c.name] })}
+                      style={{ ...S.contestantChip, background: sel ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.03)", color: sel ? "#F87171" : "#555", borderColor: sel ? "rgba(248,113,113,0.5)" : "rgba(255,255,255,0.06)", textDecoration: "line-through" }}>
+                      ☠ {c.name}
+                    </button>
+                  );
+                })}
+              </>)}
+            </div>
           </div>
-        </div>
-        <button style={{ ...S.primaryBtn, opacity: !eventForm.contestants.length || !eventForm.event ? 0.4 : 1 }} onClick={addEvent}>
-          Add {eventForm.contestants.length > 1 ? `${eventForm.contestants.length} Events` : "Event"}
+        )}
+
+        {/* Tribe mode: tribe chip picker */}
+        {mode === "tribe" && (
+          <div style={S.formRow}>
+            <label style={S.formLabel}>Select Tribe</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+              {tribeNames.map(tribeName => {
+                const members = tribeMembers(tribeName);
+                if (!members.length) return null;
+                const sel = selectedTribe === tribeName;
+                const color = tribeColor(tribeColors, tribeName);
+                return (
+                  <button key={tribeName}
+                    onClick={() => setSelectedTribe(sel ? null : tribeName)}
+                    style={{ padding: "8px 16px", borderRadius: 20, border: `1px solid ${sel ? color : "rgba(255,255,255,0.15)"}`, background: sel ? color + "33" : "rgba(255,255,255,0.03)", color: sel ? color : "#A89070", fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: sel ? 700 : 400, cursor: "pointer", letterSpacing: 1 }}>
+                    {tribeName.toUpperCase()}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedTribe && (
+              <p style={{ color: "#A89070", fontSize: 12 }}>
+                Credits: {tribeMembers(selectedTribe).join(", ")}
+              </p>
+            )}
+          </div>
+        )}
+
+        <button style={{ ...S.primaryBtn, opacity: addBtnDisabled ? 0.4 : 1 }} onClick={handleAddEvent}>
+          Add Event{mode === "tribe" && selectedTribe ? ` — ${selectedTribe}` : ""}
         </button>
       </div>
 
+      {/* Event Log */}
       <div style={S.card}>
         <h2 style={S.cardTitle}>Event Log</h2>
         {[...appState.episodes].sort((a, b) => b.number - a.number).map(ep => (
           <div key={ep.number} style={{ marginBottom: 20 }}>
             <p style={S.epLabel}>Episode {ep.number}</p>
-            {ep.events.map((ev, i) => (
-              <div key={i} style={{ ...S.eventRow, alignItems: "center", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ ...S.eventContestant, display: "block" }}>{ev.contestant}</span>
-                  <span style={{ ...S.eventLabel, display: "block" }}>{effectiveScoringRules[ev.type]?.label}</span>
+            {ep.events.map((ev, i) => {
+              const isTribeEv = !!ev.tribe;
+              const label = effectiveScoringRules[ev.type]?.label;
+              const pts = effectiveScoringRules[ev.type]?.points;
+              return (
+                <div key={i} style={{ ...S.eventRow, alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {isTribeEv ? (
+                      <span style={{ ...S.eventContestant, display: "block", color: tribeColor(tribeColors, ev.tribe), fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 12 }}>
+                        {ev.tribe.toUpperCase()}
+                      </span>
+                    ) : (
+                      <span style={{ ...S.eventContestant, display: "block", color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)) }}>
+                        {ev.contestant}
+                      </span>
+                    )}
+                    <span style={{ ...S.eventLabel, display: "block" }}>{label}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <span style={{ ...S.eventPoints, color: pts >= 0 ? "#4ADE80" : "#F87171" }}>
+                      {pts > 0 ? "+" : ""}{pts}
+                    </span>
+                    <button onClick={() => removeEvent(ep.number, i)} style={S.removeBtn}>✕</button>
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                  <span style={{ ...S.eventPoints, color: effectiveScoringRules[ev.type]?.points >= 0 ? "#4ADE80" : "#F87171" }}>
-                    {effectiveScoringRules[ev.type]?.points > 0 ? "+" : ""}{effectiveScoringRules[ev.type]?.points}
-                  </span>
-                  <button onClick={() => removeEvent(ep.number, i)} style={S.removeBtn}>✕</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ))}
         {appState.episodes.length === 0 && <p style={{ color: "#A89070" }}>No events recorded yet.</p>}

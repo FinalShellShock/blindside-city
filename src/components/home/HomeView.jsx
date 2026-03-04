@@ -144,24 +144,39 @@ export default function HomeView({ currentUser, myTeam }) {
                   )}
                 </div>
 
-                {/* Scoring events — grouped by event type */}
+                {/* Scoring events — grouped by type; tribe events show tribe name, individual show colored names */}
                 <div style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                   <p style={{ fontFamily: "'Cinzel',serif", fontSize: 11, fontWeight: 700, color: "#A89070", letterSpacing: 2, padding: "12px 20px 8px" }}>⚡ SCORING EVENTS</p>
                   {epEvents.length > 0 ? (() => {
                     const groups = {};
                     epEvents.forEach(ev => {
-                      if (!groups[ev.type]) groups[ev.type] = [];
-                      groups[ev.type].push(ev.contestant);
+                      if (!groups[ev.type]) groups[ev.type] = { tribes: [], individuals: [] };
+                      if (ev.tribe) {
+                        groups[ev.type].tribes.push(ev.tribe);
+                      } else if (ev.contestant) {
+                        groups[ev.type].individuals.push(ev.contestant);
+                      }
                     });
                     return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 20px 8px" }}>
-                        {Object.entries(groups).map(([type, contestants]) => {
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "0 20px 8px" }}>
+                        {Object.entries(groups).map(([type, group]) => {
                           const rule = effectiveScoringRules[type] || { label: type, points: 0 };
                           return (
                             <div key={type}>
-                              <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "5px 2px", flexWrap: "wrap" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 2px", flexWrap: "wrap" }}>
                                 <span style={{ color: "#A89070", fontSize: 13, flexShrink: 0 }}>{rule.label}</span>
-                                <span style={{ color: "#E8D5B5", fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0 }}>{contestants.join(", ")}</span>
+                                <span style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1, minWidth: 0, alignItems: "center" }}>
+                                  {group.tribes.map((tribe, i) => (
+                                    <span key={`t-${i}`} style={{ color: tribeColor(tribeColors, tribe), fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>
+                                      {tribe.toUpperCase()}
+                                    </span>
+                                  ))}
+                                  {group.individuals.map((name, i) => (
+                                    <span key={`i-${i}`} style={{ color: tribeColor(tribeColors, getEffectiveTribe(name)), fontWeight: 600, fontSize: 14 }}>
+                                      {name}{i < group.individuals.length - 1 ? "," : ""}
+                                    </span>
+                                  ))}
+                                </span>
                                 <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
                                   {rule.points > 0 ? "+" : ""}{rule.points}
                                 </span>
