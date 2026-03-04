@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { loadState, saveStateToDB, subscribeToState, createLeague, joinLeagueByCode, getUserLeagues, regenerateInviteCode, deleteLeague } from "../firebase.js";
+import { loadState, saveStateToDB, subscribeToState, createLeague, joinLeagueByCode, getUserProfile, regenerateInviteCode, deleteLeague, updateUserProfile } from "../firebase.js";
 import { CONTESTANTS, TRIBE_COLORS, DEFAULT_STATE, SCORING_RULES } from "../gameData.js";
 import { useScoring } from "../hooks/useScoring.js";
 
@@ -22,18 +22,23 @@ export function LeagueProvider({ children }) {
     const saved = localStorage.getItem(WATCHED_KEY);
     return saved !== null ? parseInt(saved, 10) : 0;
   });
+  const [currentUid, setCurrentUid] = useState(null);
 
   const setWatchedThrough = useCallback((ep) => {
     setWatchedThroughState(ep);
     localStorage.setItem(WATCHED_KEY, String(ep));
-  }, []);
+    // Persist cross-device: save to user profile in Firestore if logged in
+    if (currentUid) {
+      updateUserProfile(currentUid, { watchedThrough: ep }).catch(e =>
+        console.error("Failed to save watchedThrough:", e)
+      );
+    }
+  }, [currentUid]);
 
   const setCurrentLeagueId = useCallback((id) => {
     setCurrentLeagueIdState(id);
     localStorage.setItem(LEAGUE_KEY, id);
-    // Reset spoiler protection when switching leagues
-    setWatchedThroughState(0);
-    localStorage.setItem(WATCHED_KEY, "0");
+    // Spoiler filter is per-season (not per-league), so don't reset on league switch
   }, []);
 
   useEffect(() => {
@@ -66,10 +71,17 @@ export function LeagueProvider({ children }) {
 
   // ── League management actions ──
   const refreshUserLeagues = useCallback(async (uid) => {
-    if (!uid) { setLeaguesLoaded(true); return; }
+    if (!uid) { setCurrentUid(null); setLeaguesLoaded(true); return; }
+    setCurrentUid(uid);
     try {
-      const leagues = await getUserLeagues(uid);
+      const profile = await getUserProfile(uid);
+      const leagues = profile?.leagues || [];
       setUserLeagues(leagues);
+      // Sync watchedThrough from Firestore so the filter follows the user across devices
+      if (profile?.watchedThrough !== undefined) {
+        setWatchedThroughState(profile.watchedThrough);
+        localStorage.setItem(WATCHED_KEY, String(profile.watchedThrough));
+      }
       // If the localStorage league ID isn't in the user's actual league list,
       // snap to the first valid league so they don't land on an empty/wrong league.
       if (leagues.length > 0) {
