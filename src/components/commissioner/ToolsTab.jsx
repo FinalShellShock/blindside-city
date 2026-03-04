@@ -463,6 +463,13 @@ export default function ToolsTab({ currentUser, setView }) {
             }).map(c => c.name).sort();
           }
 
+          // These are inherently individual actions — never convert to tribe events
+          const INDIVIDUAL_ONLY = new Set([
+            "finds_advantage", "plays_advantage", "voted_off_with_idol",
+            "makes_fake_idol", "misuse_of_idol", "fake_idol_used_by_another",
+            "individual_reward", "individual_immunity", "sole_survivor", "quits",
+          ]);
+
           const conversions = [];
           const reviewItems = [];
 
@@ -475,11 +482,20 @@ export default function ToolsTab({ currentUser, setView }) {
               byType[ev.type].push({ idx, name: ev.contestant });
             });
             Object.entries(byType).forEach(([type, entries]) => {
+              // Never convert individual-only event types to tribe events
+              if (INDIVIDUAL_ONLY.has(type)) return;
+
               const names = entries.map(e => e.name).sort();
               const tribesPresent = [...new Set(names.map(n => originalTribe(n)))];
 
+              // Skip if any player's tribe is unknown
+              if (tribesPresent.includes("Unknown")) {
+                reviewItems.push({ episode: ep.number, type, entries, tribesPresent, singleTribe: null });
+                return;
+              }
+
               if (tribesPresent.length === 1) {
-                // Single tribe — check exact or subset match
+                // Single tribe — check exact or subset match against active roster
                 const tribe = tribesPresent[0];
                 const active = activeAtEp(ep.number, tribe);
                 const isExact = JSON.stringify(names) === JSON.stringify(active);
@@ -488,23 +504,25 @@ export default function ToolsTab({ currentUser, setView }) {
                   conversions.push({ episode: ep.number, type, isSplit: false, tribe, indices: entries.map(e => e.idx), names, isExact, activeCount: active.length });
                   return;
                 }
-              } else if (tribesPresent.length > 1) {
-                // Multi-tribe — check if each tribe's subset is a clean match
+              } else {
+                // Multi-tribe — split by original tribe without activeAtEp validation.
+                // This handles edge cases like a player winning tribal immunity then being
+                // eliminated the same episode (they're in the event but not in activeAtEp).
+                // Deduplicate names per tribe in case the same player was logged twice.
                 const splits = tribesPresent.map(tribe => {
                   const tribeEntries = entries.filter(e => originalTribe(e.name) === tribe);
-                  const tribeNames = tribeEntries.map(e => e.name).sort();
-                  const active = activeAtEp(ep.number, tribe);
-                  const isExact = JSON.stringify(tribeNames) === JSON.stringify(active);
-                  const isSubset = !isExact && tribeNames.every(n => active.includes(n));
-                  return { tribe, names: tribeNames, indices: tribeEntries.map(e => e.idx), isValid: isExact || isSubset, isExact, activeCount: active.length };
+                  const seen = new Set();
+                  const uniqueNames = tribeEntries
+                    .map(e => e.name)
+                    .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; })
+                    .sort();
+                  return { tribe, names: uniqueNames, indices: tribeEntries.map(e => e.idx) };
                 });
-                if (splits.every(s => s.isValid)) {
-                  conversions.push({ episode: ep.number, type, isSplit: true, splits, allIndices: entries.map(e => e.idx) });
-                  return;
-                }
+                conversions.push({ episode: ep.number, type, isSplit: true, splits, allIndices: entries.map(e => e.idx) });
+                return;
               }
-              // Didn't auto-detect → manual review
-              reviewItems.push({ episode: ep.number, type, entries, tribesPresent, singleTribe: tribesPresent.length === 1 ? tribesPresent[0] : null });
+              // Single-tribe but roster didn't match → manual review
+              reviewItems.push({ episode: ep.number, type, entries, tribesPresent, singleTribe: tribesPresent[0] });
             });
           });
 
