@@ -176,7 +176,7 @@ export default function HomeView({ currentUser, myTeam }) {
                         return (
                           <div key={i}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 2px", flexWrap: "wrap" }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                                 {isMultiTribe ? (
                                   <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
                                     {ev.tribes.map((t, ti) => {
@@ -194,9 +194,9 @@ export default function HomeView({ currentUser, myTeam }) {
                                     <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
                                   );})()
                                 ) : (
-                                  <span style={{ display: "block", color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
+                                  <span style={{ color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
                                 )}
-                                <span style={{ display: "block", color: "#A89070", fontSize: 13 }}>{rule.label}</span>
+                                <span style={{ color: "#A89070", fontSize: 13 }}>{rule.label}</span>
                               </div>
                               <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
                                 {rule.points > 0 ? "+" : ""}{rule.points}
