@@ -439,13 +439,8 @@ export default function ToolsTab({ currentUser, setView }) {
         </button>
       </div>
 
-      {/* Migrate Legacy Events */}
-      <div style={S.card}>
-        <h2 style={{ ...S.cardTitle, display: "flex", alignItems: "center", gap: 8 }}>Migrate Legacy Events <Tip text="Converts individual contestant events to tribe events. Auto-detects single-tribe groups and multi-tribe groups that split cleanly by tribe. Anything that doesn't fit cleanly goes to Manual Review." /></h2>
-        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 16 }}>
-          Scans for individual events that can be converted to tribe events. Multi-tribe groups (e.g. two tribes winning immunity) are detected and split automatically.
-        </p>
-        {(() => {
+      {/* Migrate Legacy Events — removed, will revisit in future session */}
+      {false && (() => {
           const rawElim = (appState.eliminated || []).map(e =>
             typeof e === "string" ? { name: e, episode: null } : e
           );
@@ -635,8 +630,7 @@ export default function ToolsTab({ currentUser, setView }) {
               {nothing && <p style={{ color: "#4ADE80", fontSize: 14 }}>✓ No legacy events to convert.</p>}
             </div>
           );
-        })()}
-      </div>
+      })()}
 
       {/* Danger Zone */}
       <div style={{ ...S.card, borderColor: "rgba(248,113,113,0.3)" }}>
