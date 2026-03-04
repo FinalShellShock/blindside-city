@@ -198,18 +198,21 @@ export default function ScoringTab({ eventForm, setEventForm }) {
                 <div key={i} style={{ ...S.eventRow, alignItems: "center", flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {isMultiTribe ? (
-                      <span style={{ ...S.eventContestant, display: "block" }}>
-                        {ev.tribes.map((t, ti) => (
-                          <span key={t}>
-                            <span style={{ color: tribeColor(tribeColors, t), fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 12, fontWeight: 700 }}>{t.toUpperCase()}</span>
-                            {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 12 }}> + </span>}
-                          </span>
-                        ))}
+                      <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                        {ev.tribes.map((t, ti) => {
+                          const c = tribeColor(tribeColors, t);
+                          return (
+                            <span key={t} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{t}</span>
+                              {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 11 }}>+</span>}
+                            </span>
+                          );
+                        })}
                       </span>
                     ) : isSingleTribe ? (
-                      <span style={{ ...S.eventContestant, display: "block", color: tribeColor(tribeColors, ev.tribe), fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 12 }}>
-                        {ev.tribe.toUpperCase()}
-                      </span>
+                      (() => { const c = tribeColor(tribeColors, ev.tribe); return (
+                        <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
+                      );})()
                     ) : (
                       <span style={{ ...S.eventContestant, display: "block", color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)) }}>
                         {ev.contestant}

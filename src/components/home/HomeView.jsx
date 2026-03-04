@@ -178,16 +178,21 @@ export default function HomeView({ currentUser, myTeam }) {
                             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 2px", flexWrap: "wrap" }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 {isMultiTribe ? (
-                                  <span style={{ display: "block" }}>
-                                    {ev.tribes.map((t, ti) => (
-                                      <span key={t}>
-                                        <span style={{ color: tribeColor(tribeColors, t), fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>{t.toUpperCase()}</span>
-                                        {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 12 }}> + </span>}
-                                      </span>
-                                    ))}
+                                  <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                                    {ev.tribes.map((t, ti) => {
+                                      const c = tribeColor(tribeColors, t);
+                                      return (
+                                        <span key={t} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                          <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{t}</span>
+                                          {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 11 }}>+</span>}
+                                        </span>
+                                      );
+                                    })}
                                   </span>
                                 ) : isSingleTribe ? (
-                                  <span style={{ display: "block", color: tribeColor(tribeColors, ev.tribe), fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>{ev.tribe.toUpperCase()}</span>
+                                  (() => { const c = tribeColor(tribeColors, ev.tribe); return (
+                                    <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
+                                  );})()
                                 ) : (
                                   <span style={{ display: "block", color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
                                 )}
