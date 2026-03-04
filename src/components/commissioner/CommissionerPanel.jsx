@@ -22,7 +22,7 @@ export default function CommissionerPanel({
   setEpisodeRecap,
 }) {
   return (
-    <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+    <div className="commish-wrapper" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
       {/* Sidebar (desktop) */}
       <div className="commish-sidebar" style={S.commishSidebar}>
         {COMMISH_TABS.map(t => (

@@ -8,7 +8,7 @@ export const globalStyles = `
   select option{background:#2A1A0A;color:#E8D5B5}textarea{font-family:'Crimson Pro',serif}
   .commish-sidebar{display:flex!important;flex-direction:column;gap:4px;min-width:160px}
   .commish-mobile-tabs{display:none!important}
-  @media(max-width:600px){.commish-sidebar{display:none!important}.commish-mobile-tabs{display:flex!important}}
+  @media(max-width:600px){.commish-sidebar{display:none!important}.commish-mobile-tabs{display:flex!important}.commish-wrapper{flex-direction:column}}
   .draft-board-grid{display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start}
   @media(max-width:700px){.draft-board-grid{grid-template-columns:1fr}}
 `;

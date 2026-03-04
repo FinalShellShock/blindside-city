@@ -86,13 +86,17 @@ export default function ScoringTab({ eventForm, setEventForm }) {
           <div key={ep.number} style={{ marginBottom: 20 }}>
             <p style={S.epLabel}>Episode {ep.number}</p>
             {ep.events.map((ev, i) => (
-              <div key={i} style={{ ...S.eventRow, alignItems: "center" }}>
-                <span style={S.eventContestant}>{ev.contestant}</span>
-                <span style={S.eventLabel}>{effectiveScoringRules[ev.type]?.label}</span>
-                <span style={{ ...S.eventPoints, color: effectiveScoringRules[ev.type]?.points >= 0 ? "#4ADE80" : "#F87171" }}>
-                  {effectiveScoringRules[ev.type]?.points > 0 ? "+" : ""}{effectiveScoringRules[ev.type]?.points}
-                </span>
-                <button onClick={() => removeEvent(ep.number, i)} style={S.removeBtn}>✕</button>
+              <div key={i} style={{ ...S.eventRow, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ ...S.eventContestant, display: "block" }}>{ev.contestant}</span>
+                  <span style={{ ...S.eventLabel, display: "block" }}>{effectiveScoringRules[ev.type]?.label}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <span style={{ ...S.eventPoints, color: effectiveScoringRules[ev.type]?.points >= 0 ? "#4ADE80" : "#F87171" }}>
+                    {effectiveScoringRules[ev.type]?.points > 0 ? "+" : ""}{effectiveScoringRules[ev.type]?.points}
+                  </span>
+                  <button onClick={() => removeEvent(ep.number, i)} style={S.removeBtn}>✕</button>
+                </div>
               </div>
             ))}
           </div>
