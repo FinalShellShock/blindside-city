@@ -54,9 +54,14 @@ function elimIcon(type) {
   return null; // voted_out uses the skull SVG
 }
 function elimText(type) {
-  if (type === "medevac" || type === "injury") return "medically evacuated";
+  if (type === "medevac") return "medically evacuated";
+  if (type === "injury") return "left due to injury";
   if (type === "quit") return "quit the game";
   return "torch snuffed";
+}
+function fmtTimestamp(iso) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export default function HomeView({ currentUser, myTeam }) {
@@ -69,6 +74,9 @@ export default function HomeView({ currentUser, myTeam }) {
         <div style={{ ...S.card, borderColor: "rgba(255,217,61,0.2)", background: "rgba(255,217,61,0.05)", marginBottom: 20 }}>
           <p style={{ fontFamily: "'Cinzel',serif", fontSize: 12, color: "#FFD93D", letterSpacing: 2, marginBottom: 6 }}>📣 COMMISSIONER MESSAGE</p>
           <p style={{ color: "#E8D5B5", fontSize: 15, lineHeight: 1.6 }}>{appState.announcement}</p>
+          {appState.announcementUpdatedAt && (
+            <p style={{ color: "#A89070", fontSize: 12, marginTop: 6 }}>Updated {fmtTimestamp(appState.announcementUpdatedAt)}</p>
+          )}
         </div>
       )}
 

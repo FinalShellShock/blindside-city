@@ -21,16 +21,17 @@ function elimRecord(eliminated, name) {
 }
 
 const ELIM_TYPES = [
-  { value: "voted_out", label: "Voted Out", icon: "🕯️" },
-  { value: "medevac",   label: "Medical Evacuation", icon: "🩺" },
-  { value: "injury",    label: "Injury / Self-Removal", icon: "🩺" },
-  { value: "quit",      label: "Quit", icon: "🏳️" },
+  { value: "voted_out", label: "Voted Out",        icon: "🕯️" },
+  { value: "injury",    label: "Injury / Medical", icon: "🩺" },
+  { value: "quit",      label: "Quit",             icon: "🏳️" },
 ];
 
 function elimIcon(type) {
+  if (type === "medevac") return "🩺"; // backward compat for old "medevac" records
   return ELIM_TYPES.find(t => t.value === type)?.icon || "🕯️";
 }
 function elimLabel(type) {
+  if (type === "medevac") return "Injury / Medical"; // backward compat
   return ELIM_TYPES.find(t => t.value === type)?.label || "Voted Out";
 }
 
@@ -74,15 +75,18 @@ export default function CastTribesTab() {
 
             if (isPending) {
               return (
-                <div key={c.name} style={{ display: "flex", alignItems: "flex-start", flexWrap: "wrap", gap: 10, padding: "12px", borderRadius: 8, background: "rgba(255,140,66,0.06)", border: "1px solid rgba(255,140,66,0.2)" }}>
-                  <Portrait slug={c.slug} tribe={curTribe} size={32} tribeColors={tribeColors}/>
-                  <span style={{ color: "#E8D5B5", fontWeight: 600, alignSelf: "center" }}>{c.name}</span>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", flex: 1 }}>
+                <div key={c.name} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, padding: "12px", borderRadius: 8, background: "rgba(255,140,66,0.06)", border: "1px solid rgba(255,140,66,0.2)" }}>
+                  {/* Portrait + name grouped so they never separate on wrap */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                    <Portrait slug={c.slug} tribe={curTribe} size={32} tribeColors={tribeColors}/>
+                    <span style={{ color: "#E8D5B5", fontWeight: 600 }}>{c.name}</span>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <label style={{ color: "#A89070", fontSize: 13 }}>Episode:</label>
+                      <label style={{ color: "#A89070", fontSize: 13 }}>Episode</label>
                       <select value={elimEpInput} onChange={e => setElimEpInput(e.target.value)} style={{ ...S.select, width: "auto", marginBottom: 0, padding: "6px 10px", fontSize: 14 }}>
                         {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
-                          <option key={n} value={n}>Ep {n}</option>
+                          <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
                     </div>

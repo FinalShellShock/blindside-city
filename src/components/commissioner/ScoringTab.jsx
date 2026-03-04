@@ -83,10 +83,10 @@ export default function ScoringTab({ eventForm, setEventForm }) {
 
         {/* Episode # */}
         <div style={S.formRow}>
-          <label style={S.formLabel}>Episode #</label>
+          <label style={S.formLabel}>Episode</label>
           <select value={eventForm.episode} onChange={e => setEventForm({ ...eventForm, episode: parseInt(e.target.value) || 1 })} style={{ ...S.select, width: "auto" }}>
             {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
-              <option key={n} value={n}>Episode {n}</option>
+              <option key={n} value={n}>{n}</option>
             ))}
           </select>
         </div>
