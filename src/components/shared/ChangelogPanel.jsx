@@ -65,15 +65,6 @@ const CHANGELOG = [
           },
         ],
       },
-      {
-        heading: "Reactions",
-        items: [
-          {
-            label: "Per-event reactions",
-            body: "You can now react to individual scoring events, eliminations, and episode recaps with emojis. Look for the reaction bar below each entry on the home feed.",
-          },
-        ],
-      },
     ],
   },
   {
