@@ -53,6 +53,9 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
 
+  const LATEST_VERSION = "v1.3";
+  const [showBanner, setShowBanner] = useState(() => localStorage.getItem("bc_seen_version") !== LATEST_VERSION);
+
   // The user key used in appState.users / appState.commissioners / appState.teams.
   // Migrated users keep their old username key; new Firebase users use their UID.
   // In dev mode, setDevUserOverride lets you impersonate any user in appState.
@@ -219,6 +222,20 @@ function App() {
           </button>
         )}
       </nav>
+
+      {showBanner && firebaseUser && (
+        <div style={{ background: "rgba(255,140,66,0.1)", borderBottom: "1px solid rgba(255,140,66,0.2)", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "8px 16px" }}>
+          <span style={{ color: "#FF8C42", fontSize: 12, fontFamily: "'Cinzel',serif", letterSpacing: 1 }}>✦ App updated</span>
+          <button
+            onClick={() => { setShowChangelog(true); setShowBanner(false); localStorage.setItem("bc_seen_version", LATEST_VERSION); }}
+            style={{ background: "none", border: "1px solid rgba(255,140,66,0.4)", borderRadius: 20, color: "#FF8C42", fontSize: 11, fontFamily: "'Cinzel',serif", letterSpacing: 1, padding: "2px 12px", cursor: "pointer" }}
+          >What's New</button>
+          <button
+            onClick={() => { setShowBanner(false); localStorage.setItem("bc_seen_version", LATEST_VERSION); }}
+            style={{ background: "none", border: "none", color: "#6A5040", fontSize: 14, cursor: "pointer", lineHeight: 1, padding: 0, marginLeft: 4 }}
+          >✕</button>
+        </div>
+      )}
 
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
       {showChangelog && <ChangelogPanel onClose={() => setShowChangelog(false)} />}

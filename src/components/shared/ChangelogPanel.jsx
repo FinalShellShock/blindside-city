@@ -2,6 +2,30 @@ import { useEffect } from "react";
 
 const CHANGELOG = [
   {
+    version: "v1.3",
+    date: "Mar 4, 2026",
+    title: "Tribe Pills & Scoring Cleanup",
+    sections: [
+      {
+        heading: null,
+        items: [
+          {
+            label: "Tribe pills",
+            body: "Tribe names in the event log and home feed now appear as colored pills — each one styled in its tribe's color so you can tell at a glance which tribe earned the points.",
+          },
+          {
+            label: "Cleaner event rows",
+            body: "Each scoring event now shows the tribe pill(s) on top and the event label with points on the same line below it. No more blank space between the tribe name and the score.",
+          },
+          {
+            label: "Episode 1 data cleaned up",
+            body: "The episode 1 scoring data was migrated to the new tribe-grouped structure — events like Team Immunity and Reward Winner are now logged per tribe rather than per individual, which is how the commissioner tools have worked for a while.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "v1.2",
     date: "Feb 25, 2026 · 1:42 PM ET",
     title: "Blindside Island — What's New",
