@@ -195,36 +195,38 @@ export default function ScoringTab({ eventForm, setEventForm }) {
               const label = effectiveScoringRules[ev.type]?.label;
               const pts = effectiveScoringRules[ev.type]?.points;
               return (
-                <div key={i} style={{ ...S.eventRow, alignItems: "center", flexWrap: "wrap" }}>
-                  <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    {isMultiTribe ? (
-                      <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-                        {ev.tribes.map((t, ti) => {
-                          const c = tribeColor(tribeColors, t);
-                          return (
-                            <span key={t} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                              <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{t}</span>
-                              {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 11 }}>+</span>}
-                            </span>
-                          );
-                        })}
-                      </span>
-                    ) : isSingleTribe ? (
-                      (() => { const c = tribeColor(tribeColors, ev.tribe); return (
-                        <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
-                      );})()
-                    ) : (
-                      <span style={{ ...S.eventContestant, color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)) }}>
-                        {ev.contestant}
-                      </span>
-                    )}
-                    <span style={S.eventLabel}>{label}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <span style={{ ...S.eventPoints, color: pts >= 0 ? "#4ADE80" : "#F87171" }}>
-                      {pts > 0 ? "+" : ""}{pts}
+                <div key={i} style={{ ...S.eventRow, flexDirection: "column", alignItems: "stretch", gap: 2 }}>
+                  {/* Row 1: tribe pills or contestant name */}
+                  {isMultiTribe ? (
+                    <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                      {ev.tribes.map((t, ti) => {
+                        const c = tribeColor(tribeColors, t);
+                        return (
+                          <span key={t} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{t}</span>
+                            {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 11 }}>+</span>}
+                          </span>
+                        );
+                      })}
                     </span>
-                    <button onClick={() => removeEvent(ep.number, i)} style={S.removeBtn}>✕</button>
+                  ) : isSingleTribe ? (
+                    (() => { const c = tribeColor(tribeColors, ev.tribe); return (
+                      <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
+                    );})()
+                  ) : (
+                    <span style={{ ...S.eventContestant, color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)) }}>
+                      {ev.contestant}
+                    </span>
+                  )}
+                  {/* Row 2: label + points + remove — always on same line */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={S.eventLabel}>{label}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{ ...S.eventPoints, color: pts >= 0 ? "#4ADE80" : "#F87171" }}>
+                        {pts > 0 ? "+" : ""}{pts}
+                      </span>
+                      <button onClick={() => removeEvent(ep.number, i)} style={S.removeBtn}>✕</button>
+                    </div>
                   </div>
                 </div>
               );

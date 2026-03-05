@@ -175,32 +175,34 @@ export default function HomeView({ currentUser, myTeam }) {
                         const isSingleTribe = !isMultiTribe && !!ev.tribe;
                         return (
                           <div key={i}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 2px", flexWrap: "wrap" }}>
-                              <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                {isMultiTribe ? (
-                                  <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-                                    {ev.tribes.map((t, ti) => {
-                                      const c = tribeColor(tribeColors, t);
-                                      return (
-                                        <span key={t} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                          <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{t}</span>
-                                          {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 11 }}>+</span>}
-                                        </span>
-                                      );
-                                    })}
-                                  </span>
-                                ) : isSingleTribe ? (
-                                  (() => { const c = tribeColor(tribeColors, ev.tribe); return (
-                                    <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
-                                  );})()
-                                ) : (
-                                  <span style={{ color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
-                                )}
+                            <div style={{ padding: "6px 2px", display: "flex", flexDirection: "column", gap: 2 }}>
+                              {/* Row 1: tribe pills or contestant name */}
+                              {isMultiTribe ? (
+                                <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                                  {ev.tribes.map((t, ti) => {
+                                    const c = tribeColor(tribeColors, t);
+                                    return (
+                                      <span key={t} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                        <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{t}</span>
+                                        {ti < ev.tribes.length - 1 && <span style={{ color: "#A89070", fontSize: 11 }}>+</span>}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              ) : isSingleTribe ? (
+                                (() => { const c = tribeColor(tribeColors, ev.tribe); return (
+                                  <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
+                                );})()
+                              ) : (
+                                <span style={{ color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
+                              )}
+                              {/* Row 2: label + points — always on same line */}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                 <span style={{ color: "#A89070", fontSize: 13 }}>{rule.label}</span>
+                                <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
+                                  {rule.points > 0 ? "+" : ""}{rule.points}
+                                </span>
                               </div>
-                              <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
-                                {rule.points > 0 ? "+" : ""}{rule.points}
-                              </span>
                             </div>
                             <ReactionBar
                               reactions={(ep.eventReactions || {})[String(i)] || {}}
