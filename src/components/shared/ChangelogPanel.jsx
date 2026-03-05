@@ -4,22 +4,73 @@ const CHANGELOG = [
   {
     version: "v1.3",
     date: "Mar 4, 2026",
-    title: "Tribe Pills & Scoring Cleanup",
+    title: "Scoring Overhaul",
     sections: [
       {
-        heading: null,
+        heading: "Scoring",
         items: [
           {
+            label: "Tribe scoring mode",
+            body: "Commissioners can now log events by tribe instead of selecting players one by one. Pick Individual or Tribe, select one or more tribes, and everyone on those tribes gets credited in a single click.",
+          },
+          {
+            label: "Multi-tribe events",
+            body: "When two tribes win the same event (e.g. both Vatu and Kalo winning immunity), you can select both at once and log it as a single event.",
+          },
+          {
             label: "Tribe pills",
-            body: "Tribe names in the event log and home feed now appear as colored pills — each one styled in its tribe's color so you can tell at a glance which tribe earned the points.",
+            body: "Tribe names in the event log and home feed now appear as colored pill badges — styled in each tribe's color so you can tell at a glance which tribe earned the points.",
           },
           {
             label: "Cleaner event rows",
-            body: "Each scoring event now shows the tribe pill(s) on top and the event label with points on the same line below it. No more blank space between the tribe name and the score.",
+            body: "Each scoring event now shows the tribe pill(s) on top with the event label and points on the same line below. No more blank space between the tribe name and the score.",
           },
           {
-            label: "Episode 1 data cleaned up",
-            body: "The episode 1 scoring data was migrated to the new tribe-grouped structure — events like Team Immunity and Reward Winner are now logged per tribe rather than per individual, which is how the commissioner tools have worked for a while.",
+            label: "New scoring event feed",
+            body: "The event log now shows one row per event instead of collapsing them. Easier to read and easier to remove individual entries if something was logged wrong.",
+          },
+          {
+            label: "Episode 1 data rebuilt",
+            body: "Episode 1 scoring data was migrated to the new tribe-grouped structure — 84 individual entries condensed into 13 clean tribe events with the same scores.",
+          },
+        ],
+      },
+      {
+        heading: "Eliminations",
+        items: [
+          {
+            label: "Elimination types",
+            body: "When marking someone out, you can now specify how they left — voted out, medically evacuated, or quit. Shows up on their player card.",
+          },
+          {
+            label: "Multiple eliminations per episode",
+            body: "The commissioner can now log more than one elimination in the same episode, which covers double tribals and back-to-back votes.",
+          },
+          {
+            label: "Mobile fix",
+            body: "The elimination tracker was clipping on narrow screens. Fixed.",
+          },
+        ],
+      },
+      {
+        heading: "Commissioner tools",
+        items: [
+          {
+            label: "Episode dropdowns",
+            body: "Episode number inputs across the commissioner panel have been replaced with dropdowns — less fiddly, fewer mistakes.",
+          },
+          {
+            label: "Announcement timestamps",
+            body: "Commissioner announcements now show when they were posted.",
+          },
+        ],
+      },
+      {
+        heading: "Reactions",
+        items: [
+          {
+            label: "Per-event reactions",
+            body: "You can now react to individual scoring events, eliminations, and episode recaps with emojis. Look for the reaction bar below each entry on the home feed.",
           },
         ],
       },
