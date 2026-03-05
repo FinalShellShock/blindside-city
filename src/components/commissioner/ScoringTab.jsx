@@ -195,7 +195,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
               const label = effectiveScoringRules[ev.type]?.label;
               const pts = effectiveScoringRules[ev.type]?.points;
               return (
-                <div key={i} style={{ ...S.eventRow, flexDirection: "column", alignItems: "stretch", gap: 2 }}>
+                <div key={i} style={{ ...S.eventRow, flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                   {/* Row 1: tribe pills or contestant name */}
                   {isMultiTribe ? (
                     <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
@@ -219,7 +219,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
                     </span>
                   )}
                   {/* Row 2: label + points + remove — always on same line */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
                     <span style={S.eventLabel}>{label}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                       <span style={{ ...S.eventPoints, color: pts >= 0 ? "#4ADE80" : "#F87171" }}>

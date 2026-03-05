@@ -175,7 +175,7 @@ export default function HomeView({ currentUser, myTeam }) {
                         const isSingleTribe = !isMultiTribe && !!ev.tribe;
                         return (
                           <div key={i}>
-                            <div style={{ padding: "6px 2px", display: "flex", flexDirection: "column", gap: 2 }}>
+                            <div style={{ padding: "6px 2px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                               {/* Row 1: tribe pills or contestant name */}
                               {isMultiTribe ? (
                                 <span style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
@@ -197,7 +197,7 @@ export default function HomeView({ currentUser, myTeam }) {
                                 <span style={{ color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
                               )}
                               {/* Row 2: label + points — always on same line */}
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
                                 <span style={{ color: "#A89070", fontSize: 13 }}>{rule.label}</span>
                                 <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 13, color: rule.points >= 0 ? "#4ADE80" : "#F87171", flexShrink: 0 }}>
                                   {rule.points > 0 ? "+" : ""}{rule.points}
