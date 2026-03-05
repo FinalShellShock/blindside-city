@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { S } from "../../styles/theme.js";
 import { useLeague } from "../../contexts/LeagueContext.jsx";
 import { startDraft } from "../../firebase.js";
@@ -16,6 +16,18 @@ export default function DraftLobby({ currentUser, isCommissioner }) {
     draftSettings.draftOrder || users.map(([uid]) => uid)
   );
   const [busy, setBusy] = useState(false);
+
+  // When users join while the lobby is already open, appState.users updates via
+  // the Firestore subscription but draftOrder (useState) doesn't re-initialize.
+  // This effect appends any newly joined members to the draft order.
+  useEffect(() => {
+    if (!appState?.users) return;
+    const currentUids = Object.keys(appState.users);
+    setDraftOrder(prev => {
+      const newUids = currentUids.filter(uid => !prev.includes(uid));
+      return newUids.length > 0 ? [...prev, ...newUids] : prev;
+    });
+  }, [appState?.users]);
 
   const moveUser = (uid, dir) => {
     const idx = draftOrder.indexOf(uid);
