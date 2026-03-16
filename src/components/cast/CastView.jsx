@@ -20,7 +20,7 @@ function elimEpisode(eliminated, name) {
 }
 
 export default function CastView() {
-  const { appState, contestantScores, eliminated, tribeOverrides, getEffectiveTribe, contestants, tribeColors } = useLeague();
+  const { appState, contestantScores, eliminated, getEffectiveTribe, contestants, tribeColors } = useLeague();
   const [expandedCast, setExpandedCast] = useState(null);
 
   return (
@@ -36,7 +36,7 @@ export default function CastView() {
             const events = contestantScores[c.name]?.events || [];
             const isExpanded = expandedCast === c.name;
             const currentTribe = getEffectiveTribe(c.name);
-            const tribeChanged = tribeOverrides[c.name] && tribeOverrides[c.name] !== c.tribe;
+            const tribeChanged = currentTribe !== c.tribe;
             const epNum = elimEpisode(eliminated, c.name);
             return (
               <div key={c.name}>

@@ -61,4 +61,5 @@ export const DEFAULT_STATE = {
   announcement: "",
   eliminated: [],
   tribeOverrides: {},
+  tribeSwaps: [],
 };
