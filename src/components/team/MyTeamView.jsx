@@ -34,7 +34,7 @@ function elimEpisode(eliminated, name) {
 }
 
 export default function MyTeamView({ currentUser, myTeam, isUserCommissioner }) {
-  const { appState, saveState, contestantScores, teamScores, eliminated, tribeOverrides, getEffectiveTribe, contestants, tribeColors } = useLeague();
+  const { appState, saveState, contestantScores, teamScores, eliminated, getEffectiveTribe, contestants, tribeColors } = useLeague();
   const [editingTeamName, setEditingTeamName] = useState(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [editingMotto, setEditingMotto] = useState(null);
@@ -152,7 +152,7 @@ export default function MyTeamView({ currentUser, myTeam, isUserCommissioner }) 
             const c = contestants.find(x => x.name === m);
             const isE = isElim(eliminated, m);
             const currentTribe = getEffectiveTribe(m);
-            const tribeChanged = tribeOverrides[m] && tribeOverrides[m] !== c?.tribe;
+            const tribeChanged = currentTribe !== c?.tribe;
             const memberEvents = contestantScores[m]?.events || [];
             const isExpanded = expandedMember === m;
             const byEp = {};

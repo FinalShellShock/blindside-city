@@ -38,10 +38,10 @@ export default function ScoringTab({ eventForm, setEventForm }) {
   // All tribe names from tribeColors (e.g. ["Cila", "Kalo", "Vatu", "Merged"])
   const tribeNames = Object.keys(tribeColors);
 
-  // Active (non-eliminated) members of a given tribe
+  // Active (non-eliminated) members of a given tribe at the selected episode
   const tribeMembers = (tribeName) =>
     contestants
-      .filter(c => !isElim(eliminated, c.name) && getEffectiveTribe(c.name) === tribeName)
+      .filter(c => !isElim(eliminated, c.name) && getEffectiveTribe(c.name, eventForm.episode) === tribeName)
       .map(c => c.name);
 
   // All members across all selected tribes
@@ -127,7 +127,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
                 return (
                   <button key={c.name}
                     onClick={() => setEventForm({ ...eventForm, contestants: sel ? eventForm.contestants.filter(x => x !== c.name) : [...eventForm.contestants, c.name] })}
-                    style={{ ...S.contestantChip, background: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name)) : "rgba(255,255,255,0.1)", fontWeight: sel ? 700 : 400 }}>
+                    style={{ ...S.contestantChip, background: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name, eventForm.episode)) : "rgba(255,255,255,0.05)", color: sel ? "#fff" : "#A89070", borderColor: sel ? tribeColor(tribeColors, getEffectiveTribe(c.name, eventForm.episode)) : "rgba(255,255,255,0.1)", fontWeight: sel ? 700 : 400 }}>
                     {c.name}
                   </button>
                 );
@@ -214,7 +214,7 @@ export default function ScoringTab({ eventForm, setEventForm }) {
                       <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
                     );})()
                   ) : (
-                    <span style={{ ...S.eventContestant, color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)) }}>
+                    <span style={{ ...S.eventContestant, color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant, ep.number)) }}>
                       {ev.contestant}
                     </span>
                   )}

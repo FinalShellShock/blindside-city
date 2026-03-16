@@ -141,9 +141,43 @@ export function LeagueProvider({ children }) {
   const contestants = appState?.contestants || CONTESTANTS;
   const tribeColors = appState?.tribeColors || TRIBE_COLORS;
 
-  const getEffectiveTribe = useCallback((name) => {
-    return tribeOverrides[name] || contestants.find(c => c.name === name)?.tribe || "Unknown";
-  }, [tribeOverrides, contestants]);
+  const tribeSwaps = appState?.tribeSwaps || [];
+
+  // Auto-migrate: if tribeOverrides has entries but tribeSwaps is absent/empty,
+  // convert to tribeSwaps format (assume the latest episode with events as the swap episode).
+  useEffect(() => {
+    if (!appState) return;
+    const overrides = appState.tribeOverrides || {};
+    const swaps = appState.tribeSwaps || [];
+    if (Object.keys(overrides).length > 0 && swaps.length === 0) {
+      // Find the latest episode number to use as the swap episode
+      const episodes = appState.episodes || [];
+      const maxEp = episodes.reduce((max, ep) => Math.max(max, ep.number || 0), 0);
+      const swapEpisode = maxEp || 3; // fallback to 3 if no episodes
+      const migratedSwaps = [{ episode: swapEpisode, changes: { ...overrides } }];
+      console.log(`[Migration] Converting tribeOverrides to tribeSwaps at episode ${swapEpisode}:`, overrides);
+      saveState({ ...appState, tribeSwaps: migratedSwaps });
+    }
+  }, [appState?.tribeOverrides, appState?.tribeSwaps]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Episode-aware tribe lookup: walks tribeSwaps in order to find the tribe
+  // a contestant was on during a specific episode. Defaults to 999 (latest).
+  const getEffectiveTribe = useCallback((name, episode = 999) => {
+    const original = contestants.find(c => c.name === name)?.tribe || "Unknown";
+    // If tribeSwaps exists, use the new per-episode system
+    if (tribeSwaps.length > 0) {
+      let tribe = original;
+      const sorted = [...tribeSwaps].sort((a, b) => a.episode - b.episode);
+      for (const swap of sorted) {
+        if (swap.episode <= episode && swap.changes[name]) {
+          tribe = swap.changes[name];
+        }
+      }
+      return tribe;
+    }
+    // Backward compat: fall back to flat tribeOverrides if no tribeSwaps yet
+    return tribeOverrides[name] || original;
+  }, [tribeSwaps, tribeOverrides, contestants]);
 
   // Merge commissioner point overrides with defaults, then append any custom rules.
   // Custom rules are stored as appState.customRules: [{ id, label, points }]
@@ -247,13 +281,56 @@ export function LeagueProvider({ children }) {
     await saveState({ ...appState, eliminated: normElim });
   }, [appState, saveState]);
 
-  const setContestantTribe = useCallback(async (contestantName, newTribe) => {
-    const overrides = { ...(appState.tribeOverrides || {}) };
-    const original = CONTESTANTS.find(c => c.name === contestantName)?.tribe;
-    if (newTribe === original) { delete overrides[contestantName]; }
-    else { overrides[contestantName] = newTribe; }
-    await saveState({ ...appState, tribeOverrides: overrides });
-  }, [appState, saveState]);
+  const setContestantTribe = useCallback(async (contestantName, newTribe, episode) => {
+    const swaps = [...(appState.tribeSwaps || [])];
+    let entry = swaps.find(s => s.episode === episode);
+    if (!entry) {
+      entry = { episode, changes: {} };
+      swaps.push(entry);
+    } else {
+      entry = { ...entry, changes: { ...entry.changes } };
+      swaps[swaps.findIndex(s => s.episode === episode)] = entry;
+    }
+    // Check if the new tribe matches what the contestant was on before this swap
+    const tribeBeforeSwap = getEffectiveTribe(contestantName, episode - 1);
+    if (newTribe === tribeBeforeSwap) {
+      delete entry.changes[contestantName];
+      // Remove the entry entirely if no changes remain
+      if (Object.keys(entry.changes).length === 0) {
+        const idx = swaps.findIndex(s => s.episode === episode);
+        swaps.splice(idx, 1);
+      }
+    } else {
+      entry.changes[contestantName] = newTribe;
+    }
+    swaps.sort((a, b) => a.episode - b.episode);
+    // Also maintain tribeOverrides as latest-state for backward compat
+    const latestOverrides = {};
+    const sortedSwaps = [...swaps].sort((a, b) => a.episode - b.episode);
+    for (const swap of sortedSwaps) {
+      Object.entries(swap.changes).forEach(([name, tribe]) => {
+        const orig = contestants.find(c => c.name === name)?.tribe;
+        if (tribe === orig) { delete latestOverrides[name]; }
+        else { latestOverrides[name] = tribe; }
+      });
+    }
+    await saveState({ ...appState, tribeSwaps: swaps, tribeOverrides: latestOverrides });
+  }, [appState, saveState, getEffectiveTribe, contestants]);
+
+  const deleteTribeSwap = useCallback(async (episode) => {
+    const swaps = (appState.tribeSwaps || []).filter(s => s.episode !== episode);
+    // Recompute tribeOverrides from remaining swaps
+    const latestOverrides = {};
+    const sortedSwaps = [...swaps].sort((a, b) => a.episode - b.episode);
+    for (const swap of sortedSwaps) {
+      Object.entries(swap.changes).forEach(([name, tribe]) => {
+        const orig = contestants.find(c => c.name === name)?.tribe;
+        if (tribe === orig) { delete latestOverrides[name]; }
+        else { latestOverrides[name] = tribe; }
+      });
+    }
+    await saveState({ ...appState, tribeSwaps: swaps, tribeOverrides: latestOverrides });
+  }, [appState, saveState, contestants]);
 
   const addReaction = useCallback(async (currentUser, episodeNum, target, emoji) => {
     if (!currentUser) return;
@@ -312,7 +389,7 @@ export function LeagueProvider({ children }) {
       contestants,
       tribeColors,
       eliminated: visibleEliminated,
-      tribeOverrides,
+      tribeSwaps,
       getEffectiveTribe,
       contestantScores,
       teamScores,
@@ -325,6 +402,7 @@ export function LeagueProvider({ children }) {
       confirmEliminate,
       unEliminate,
       setContestantTribe,
+      deleteTribeSwap,
       addReaction,
     }}>
       {children}

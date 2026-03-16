@@ -36,12 +36,13 @@ function elimLabel(type) {
 }
 
 export default function CastTribesTab() {
-  const { eliminated, tribeOverrides, getEffectiveTribe, confirmEliminate, unEliminate, setContestantTribe, contestants, tribeColors } = useLeague();
+  const { eliminated, tribeSwaps, getEffectiveTribe, confirmEliminate, unEliminate, setContestantTribe, deleteTribeSwap, contestants, tribeColors } = useLeague();
   const startingTribes = Object.keys(tribeColors);
   const allTribeOptions = [...startingTribes, "Merged"];
   const [elimPending, setElimPending] = useState(null);
   const [elimEpInput, setElimEpInput] = useState(1);
   const [elimTypeInput, setElimTypeInput] = useState("voted_out");
+  const [tribeEpisode, setTribeEpisode] = useState(999); // 999 = "Latest / Current"
 
   return (
     <div>
@@ -126,10 +127,39 @@ export default function CastTribesTab() {
       {/* Tribe Tracker */}
       <div style={S.card}>
         <h2 style={S.cardTitle}>Tribe Tracker</h2>
-        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 4 }}>Use this after tribe swaps or the merge. Original tribe shown in brackets.</p>
-        <p style={{ color: "#A89070", fontSize: 12, marginBottom: 16, fontStyle: "italic" }}>Changes update tribe colors throughout the entire app.</p>
+        <p style={{ color: "#A89070", fontSize: 13, marginBottom: 4 }}>Use this after tribe swaps or the merge. Select the episode when the swap happened.</p>
+        <p style={{ color: "#A89070", fontSize: 12, marginBottom: 16, fontStyle: "italic" }}>Changes are saved per-episode so scoring stays accurate for earlier episodes.</p>
+
+        {/* Episode selector for tribe changes */}
+        <div style={{ ...S.formRow, marginBottom: 16 }}>
+          <label style={S.formLabel}>Apply changes as of episode</label>
+          <select value={tribeEpisode} onChange={e => setTribeEpisode(parseInt(e.target.value))} style={{ ...S.select, width: "auto" }}>
+            <option value={999}>Latest / Current</option>
+            {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+              <option key={n} value={n}>Episode {n}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Show existing tribe swaps */}
+        {tribeSwaps.length > 0 && (
+          <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: "rgba(255,140,66,0.05)", border: "1px solid rgba(255,140,66,0.12)" }}>
+            <p style={{ fontFamily: "'Cinzel',serif", fontSize: 12, color: "#FF8C42", letterSpacing: 1, marginBottom: 8 }}>RECORDED SWAPS</p>
+            {[...tribeSwaps].sort((a, b) => a.episode - b.episode).map(swap => (
+              <div key={swap.episode} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <div>
+                  <span style={{ color: "#FF8C42", fontWeight: 700, fontSize: 13, marginRight: 8 }}>Ep {swap.episode}</span>
+                  <span style={{ color: "#A89070", fontSize: 12 }}>{Object.keys(swap.changes).length} player{Object.keys(swap.changes).length !== 1 ? "s" : ""} moved</span>
+                </div>
+                <button onClick={() => deleteTribeSwap(swap.episode)} style={{ ...S.smallBtnGhost, fontSize: 11, padding: "2px 8px", color: "#F87171", borderColor: "rgba(248,113,113,0.3)" }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {allTribeOptions.map(tribeLabel => {
-          const membersInTribe = contestants.filter(c => getEffectiveTribe(c.name) === tribeLabel);
+          const viewEp = tribeEpisode === 999 ? 999 : tribeEpisode;
+          const membersInTribe = contestants.filter(c => getEffectiveTribe(c.name, viewEp) === tribeLabel);
           if (membersInTribe.length === 0) return null;
           return (
             <div key={tribeLabel} style={{ marginBottom: 20 }}>
@@ -141,7 +171,8 @@ export default function CastTribesTab() {
               <div style={{ display: "grid", gap: 6 }}>
                 {membersInTribe.map(c => {
                   const isE = isElim(eliminated, c.name);
-                  const swapped = tribeOverrides[c.name] && tribeOverrides[c.name] !== c.tribe;
+                  const currentTribeAtEp = getEffectiveTribe(c.name, viewEp);
+                  const swapped = currentTribeAtEp !== c.tribe;
                   return (
                     <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", opacity: isE ? 0.5 : 1 }}>
                       <Portrait slug={c.slug} tribe={tribeLabel} size={32} eliminated={isE} tribeColors={tribeColors}/>
@@ -151,12 +182,12 @@ export default function CastTribesTab() {
                       </div>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         {allTribeOptions.map(t => (
-                          <button key={t} onClick={() => setContestantTribe(c.name, t)} style={{
+                          <button key={t} onClick={() => setContestantTribe(c.name, t, tribeEpisode === 999 ? 999 : tribeEpisode)} style={{
                             padding: "3px 8px", borderRadius: 4, fontSize: 11, cursor: "pointer",
                             fontFamily: "'Cinzel',serif", fontWeight: 600,
                             border: `1px solid ${tribeColor(tribeColors, t)}55`,
-                            background: getEffectiveTribe(c.name) === t ? tribeColor(tribeColors, t) + "33" : "transparent",
-                            color: getEffectiveTribe(c.name) === t ? tribeColor(tribeColors, t) : "#A89070",
+                            background: currentTribeAtEp === t ? tribeColor(tribeColors, t) + "33" : "transparent",
+                            color: currentTribeAtEp === t ? tribeColor(tribeColors, t) : "#A89070",
                             transition: "all 0.12s",
                           }}>
                             {t}

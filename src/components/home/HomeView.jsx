@@ -194,7 +194,7 @@ export default function HomeView({ currentUser, myTeam }) {
                                   <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, background: c + "33", border: `1px solid ${c}`, color: c, fontFamily: "'Cinzel',serif", letterSpacing: 1, fontSize: 11, fontWeight: 700 }}>{ev.tribe}</span>
                                 );})()
                               ) : (
-                                <span style={{ color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
+                                <span style={{ color: tribeColor(tribeColors, getEffectiveTribe(ev.contestant, ep.number)), fontWeight: 600, fontSize: 14 }}>{ev.contestant}</span>
                               )}
                               {/* Row 2: label + points — always on same line */}
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
